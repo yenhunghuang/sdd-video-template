@@ -53,30 +53,47 @@ export const SceneTitle: React.FC<SceneTitleProps> = ({
     >
       <div
         style={{
-          opacity: titleOpacity,
-          transform: `scale(${titleScale})`,
-          color: THEME.text,
-          fontSize: 64,
-          fontWeight: "bold",
-          textAlign: "center",
+          backgroundColor: "#1E293B88",
+          borderRadius: 16,
+          padding: "48px 64px",
+          border: "1px solid #33415544",
+          maxWidth: 1200,
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
         }}
       >
-        {title}
-      </div>
-      {subtitle && (
         <div
           style={{
-            opacity: subtitleOpacity,
-            transform: `scale(${subtitleScale})`,
-            color: THEME.muted,
-            fontSize: 28,
+            opacity: titleOpacity,
+            transform: `scale(${titleScale})`,
+            color: THEME.text,
+            fontSize: 64,
+            fontWeight: "bold",
             textAlign: "center",
-            marginTop: 16,
+            maxWidth: 1100,
+            lineHeight: 1.3,
           }}
         >
-          {subtitle}
+          {title}
         </div>
-      )}
+        {subtitle && (
+          <div
+            style={{
+              opacity: subtitleOpacity,
+              transform: `scale(${subtitleScale})`,
+              color: THEME.muted,
+              fontSize: 28,
+              textAlign: "center",
+              marginTop: 16,
+              maxWidth: 1000,
+              lineHeight: 1.5,
+            }}
+          >
+            {subtitle}
+          </div>
+        )}
+      </div>
     </AbsoluteFill>
   );
 };

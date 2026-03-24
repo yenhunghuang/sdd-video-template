@@ -52,6 +52,7 @@
     ]
   },
   "targetUsers": ["全端工程師", "技術主管", "專案經理"],
+  "audience": "technical",
   "iterations": [
     {
       "iterationNumber": "001",

@@ -36,6 +36,7 @@
   },
   "coloredModules": ["auth", "api"],
   "highlightModules": ["api"],
+  "audience": "technical",
   "businessImpact": "使用者現在可以安全登入，不同角色看到不同功能",
   "businessSpecDiff": {
     "before": "任何人都可以看到所有資料",

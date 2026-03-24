@@ -65,52 +65,59 @@ const PrinciplesScene: React.FC<{
       >
         Core Principles
       </div>
-      {principles.map((p, i) => {
-        const entrance = spring({
-          frame,
-          fps,
-          delay: i * stagger,
-          config: { damping: 200 },
-        });
-        const opacity = interpolate(entrance, [0, 1], [0, 1]);
-        const translateX = interpolate(entrance, [0, 1], [-30, 0]);
+      <div style={{ maxWidth: 1200 }}>
+        {principles.map((p, i) => {
+          const entrance = spring({
+            frame,
+            fps,
+            delay: i * stagger,
+            config: { damping: 200 },
+          });
+          const opacity = interpolate(entrance, [0, 1], [0, 1]);
+          const translateX = interpolate(entrance, [0, 1], [-30, 0]);
 
-        return (
-          <div
-            key={i}
-            style={{
-              opacity,
-              transform: `translateX(${translateX}px)`,
-              marginBottom: 36,
-              display: "flex",
-              alignItems: "baseline",
-              gap: 20,
-            }}
-          >
-            <span
+          return (
+            <div
+              key={i}
               style={{
-                fontSize: 36,
-                color: THEME.accent,
-                fontWeight: 700,
-                whiteSpace: "nowrap",
+                opacity,
+                transform: `translateX(${translateX}px)`,
+                marginBottom: 20,
+                backgroundColor: "#1E293B",
+                borderRadius: 10,
+                border: "1px solid #334155",
+                borderLeft: `4px solid ${THEME.accent}`,
+                padding: "16px 24px",
+                display: "flex",
+                alignItems: "baseline",
+                gap: 20,
               }}
             >
-              {p.title}
-            </span>
-            <Sequence
-              from={i * stagger + 15}
-              layout="none"
-            >
-              <TypewriterText
-                text={p.description}
-                speed={1.5}
-                cursor={i === principles.length - 1}
-                style={{ fontSize: 24, color: THEME.text }}
-              />
-            </Sequence>
-          </div>
-        );
-      })}
+              <span
+                style={{
+                  fontSize: 24,
+                  color: THEME.accent,
+                  fontWeight: 700,
+                  whiteSpace: "nowrap",
+                }}
+              >
+                {p.title}
+              </span>
+              <Sequence
+                from={i * stagger + 15}
+                layout="none"
+              >
+                <TypewriterText
+                  text={p.description}
+                  speed={1.5}
+                  cursor={i === principles.length - 1}
+                  style={{ fontSize: 18, color: THEME.text }}
+                />
+              </Sequence>
+            </div>
+          );
+        })}
+      </div>
     </AbsoluteFill>
   );
 };
@@ -155,10 +162,18 @@ const TaskSummaryScene: React.FC<{
         <span style={{ fontSize: 28, color: THEME.muted }}>total tasks</span>
       </div>
 
-      <div style={{ display: "flex", gap: 60 }}>
+      <div style={{ display: "flex", gap: 24 }}>
         {taskSummary.categories.map((cat, i) => (
           <Sequence key={i} from={20 + i * 15} layout="none">
-            <div style={{ textAlign: "center" }}>
+            <div
+              style={{
+                backgroundColor: "#1E293B",
+                borderRadius: 10,
+                border: "1px solid #334155",
+                padding: "20px 32px",
+                textAlign: "center",
+              }}
+            >
               <CounterAnimation
                 from={0}
                 to={cat.count}
@@ -168,7 +183,7 @@ const TaskSummaryScene: React.FC<{
               <div
                 style={{
                   color: THEME.muted,
-                  fontSize: 16,
+                  fontSize: 14,
                   marginTop: 8,
                   maxWidth: 160,
                 }}
@@ -238,20 +253,11 @@ export const FullStoryVideo: React.FC<FullStoryData> = (props) => {
         timing={linearTiming({ durationInFrames: TRANSITION_FRAMES })}
       />,
       <TransitionSeries.Sequence key={`diff-${i}`} durationInFrames={SPEC_DIFF_FRAMES}>
-        <AbsoluteFill
-          style={{
-            backgroundColor: THEME.bg,
-            justifyContent: "center",
-            alignItems: "center",
-          }}
-        >
-          <SpecDiff
-            before={specDiff.before}
-            after={specDiff.after}
-            transitionFrame={Math.floor(SPEC_DIFF_FRAMES / 2)}
-            style={{ maxWidth: 1200 }}
-          />
-        </AbsoluteFill>
+        <SpecDiff
+          before={specDiff.before}
+          after={specDiff.after}
+          transitionFrame={Math.floor(SPEC_DIFF_FRAMES / 2)}
+        />
       </TransitionSeries.Sequence>,
       <TransitionSeries.Transition
         key={`trans-tasks-${i}`}
@@ -264,7 +270,7 @@ export const FullStoryVideo: React.FC<FullStoryData> = (props) => {
             backgroundColor: THEME.bg,
             justifyContent: "center",
             alignItems: "center",
-            padding: "80px 200px",
+            padding: "80px 160px",
           }}
         >
           <div

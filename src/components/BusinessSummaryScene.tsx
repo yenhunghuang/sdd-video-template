@@ -42,14 +42,37 @@ export const BusinessSummaryScene: React.FC<BusinessSummarySceneProps> = ({
         style={{
           opacity,
           transform: `scale(${scale})`,
-          color: THEME.accent,
-          fontSize: 40,
-          fontWeight: 700,
-          textAlign: "center",
-          padding: "0 80px",
+          backgroundColor: "#1E293B",
+          borderRadius: 16,
+          border: "1px solid #33415566",
+          borderTop: `4px solid ${THEME.accent}`,
+          padding: "48px 64px",
+          maxWidth: 1100,
         }}
       >
-        {impact}
+        <div
+          style={{
+            fontSize: 12,
+            letterSpacing: 3,
+            color: THEME.muted,
+            textTransform: "uppercase",
+            marginBottom: 20,
+            textAlign: "center",
+          }}
+        >
+          BUSINESS IMPACT
+        </div>
+        <div
+          style={{
+            color: THEME.accent,
+            fontSize: 36,
+            fontWeight: 700,
+            textAlign: "center",
+            lineHeight: 1.6,
+          }}
+        >
+          {impact}
+        </div>
       </div>
     </AbsoluteFill>
   );

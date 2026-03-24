@@ -29,7 +29,8 @@ export const TaskChecklist: React.FC<TaskChecklistProps> = ({
       style={{
         display: "flex",
         flexDirection: "column",
-        gap: 12,
+        gap: 8,
+        maxWidth: 900,
         ...style,
       }}
     >
@@ -66,13 +67,18 @@ export const TaskChecklist: React.FC<TaskChecklistProps> = ({
               gap: 12,
               opacity,
               transform: `translateY(${translateY}px)`,
+              backgroundColor: "#1E293B",
+              borderRadius: 10,
+              border: "1px solid #334155",
+              padding: "12px 20px",
+              borderLeft: `4px solid ${isCompleted ? THEME.success : THEME.muted}`,
             }}
           >
             {/* Checkbox / mark */}
             <div
               style={{
-                width: 28,
-                height: 28,
+                width: 24,
+                height: 24,
                 borderRadius: 6,
                 display: "flex",
                 alignItems: "center",
@@ -100,7 +106,7 @@ export const TaskChecklist: React.FC<TaskChecklistProps> = ({
             {/* Title */}
             <span
               style={{
-                fontSize: 20,
+                fontSize: 16,
                 color: isCompleted ? THEME.text : THEME.muted,
                 textDecoration: isCompleted ? "none" : "line-through",
                 fontWeight: 500,

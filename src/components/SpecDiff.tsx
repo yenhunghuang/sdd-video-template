@@ -1,5 +1,5 @@
 import React from "react";
-import { useCurrentFrame, interpolate } from "remotion";
+import { useCurrentFrame, interpolate, AbsoluteFill } from "remotion";
 import { THEME } from "../styles/theme";
 
 interface SpecDiffProps {
@@ -41,15 +41,13 @@ export const SpecDiff: React.FC<SpecDiffProps> = ({
   );
 
   return (
-    <div
+    <AbsoluteFill
       className={className}
       style={{
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
+        backgroundColor: THEME.bg,
         justifyContent: "center",
+        alignItems: "center",
         opacity: fadeIn,
-        position: "relative",
         ...style,
       }}
     >
@@ -60,29 +58,43 @@ export const SpecDiff: React.FC<SpecDiffProps> = ({
           display: "flex",
           flexDirection: "column",
           alignItems: "center",
+          justifyContent: "center",
           opacity: beforeOpacity,
+          left: 160,
+          right: 160,
+          top: 0,
+          bottom: 0,
         }}
       >
-        <span
+        <div
           style={{
-            fontSize: 14,
-            color: THEME.muted,
-            letterSpacing: 2,
-            marginBottom: 8,
+            fontSize: 13,
+            color: THEME.danger,
+            letterSpacing: 3,
+            marginBottom: 24,
+            textTransform: "uppercase" as const,
+            fontWeight: 600,
+            padding: "4px 16px",
+            border: `1px solid ${THEME.danger}44`,
+            borderRadius: 4,
           }}
         >
           BEFORE
-        </span>
-        <span
+        </div>
+        <div
           style={{
-            fontSize: 28,
-            color: THEME.danger,
-            textDecoration: "line-through",
+            fontSize: 32,
+            color: THEME.text,
             fontWeight: 600,
+            textAlign: "center",
+            lineHeight: 1.6,
+            opacity: 0.85,
+            textDecoration: "line-through",
+            textDecorationColor: `${THEME.danger}88`,
           }}
         >
           {before}
-        </span>
+        </div>
       </div>
 
       {/* AFTER text */}
@@ -92,30 +104,41 @@ export const SpecDiff: React.FC<SpecDiffProps> = ({
           display: "flex",
           flexDirection: "column",
           alignItems: "center",
+          justifyContent: "center",
           opacity: afterOpacity,
+          left: 160,
+          right: 160,
+          top: 0,
+          bottom: 0,
         }}
       >
-        <span
+        <div
           style={{
-            fontSize: 14,
-            color: THEME.muted,
-            letterSpacing: 2,
-            marginBottom: 8,
+            fontSize: 13,
+            color: THEME.success,
+            letterSpacing: 3,
+            marginBottom: 24,
+            textTransform: "uppercase" as const,
+            fontWeight: 600,
+            padding: "4px 16px",
+            border: `1px solid ${THEME.success}44`,
+            borderRadius: 4,
           }}
         >
           AFTER
-        </span>
-        <span
+        </div>
+        <div
           style={{
-            fontSize: 28,
-            color: THEME.success,
-            textDecoration: "underline",
+            fontSize: 32,
+            color: THEME.text,
             fontWeight: 600,
+            textAlign: "center",
+            lineHeight: 1.6,
           }}
         >
           {after}
-        </span>
+        </div>
       </div>
-    </div>
+    </AbsoluteFill>
   );
 };

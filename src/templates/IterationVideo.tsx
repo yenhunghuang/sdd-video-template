@@ -64,20 +64,11 @@ export const IterationVideo: React.FC<IterationData> = (props) => {
       )}
 
       <TransitionSeries.Sequence durationInFrames={SPEC_DIFF_FRAMES}>
-        <AbsoluteFill
-          style={{
-            backgroundColor: THEME.bg,
-            justifyContent: "center",
-            alignItems: "center",
-          }}
-        >
-          <SpecDiff
-            before={specDiff.before}
-            after={specDiff.after}
-            transitionFrame={Math.floor(SPEC_DIFF_FRAMES / 2)}
-            style={{ maxWidth: 1200 }}
-          />
-        </AbsoluteFill>
+        <SpecDiff
+          before={specDiff.before}
+          after={specDiff.after}
+          transitionFrame={Math.floor(SPEC_DIFF_FRAMES / 2)}
+        />
       </TransitionSeries.Sequence>
 
       <TransitionSeries.Transition
@@ -91,7 +82,7 @@ export const IterationVideo: React.FC<IterationData> = (props) => {
             backgroundColor: THEME.bg,
             justifyContent: "center",
             alignItems: "center",
-            padding: "80px 200px",
+            padding: "80px 160px",
           }}
         >
           <div

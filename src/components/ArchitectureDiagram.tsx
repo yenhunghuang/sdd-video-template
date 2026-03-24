@@ -9,8 +9,9 @@ import {
 import type {
   ArchitectureDefinition,
   ModuleDefinition,
+  ModuleCategory,
 } from "../types/schemas";
-import { MODULE_COLORS, GRAY, THEME } from "../styles/theme";
+import { MODULE_COLORS, THEME } from "../styles/theme";
 
 type ArchitectureDiagramProps = {
   architecture: ArchitectureDefinition;
@@ -24,25 +25,48 @@ type ArchitectureDiagramProps = {
   height?: number;
 };
 
-const BASE_MODULE_WIDTH = 200;
-const BASE_MODULE_HEIGHT = 80;
-const BASE_GAP_X = 60;
-const BASE_GAP_Y = 50;
-const MIN_MODULE_WIDTH = 120;
-const MIN_MODULE_HEIGHT = 50;
-const PADDING = 100;
-const TITLE_HEIGHT = 60;
+// --- Layout constants ---
+const MODULE_W = 220;
+const MODULE_H = 76;
+const GAP_X = 50;
+const GAP_Y = 40;
+const LAYER_PAD_X = 24;
+const LAYER_PAD_Y = 44; // top (room for label)
+const LAYER_PAD_BOTTOM = 16;
+const PADDING = 80;
+const TITLE_HEIGHT = 56;
 
-const getModulePosition = (
-  mod: ModuleDefinition,
-  cellWidth: number,
-  cellHeight: number,
-  offsetX: number,
-  offsetY: number,
-) => ({
-  x: offsetX + mod.position.col * cellWidth,
-  y: offsetY + mod.position.row * cellHeight,
-});
+// --- Category display names ---
+const CATEGORY_CN: Record<string, string> = {
+  core: "核心層",
+  api: "介面層",
+  data: "資料層",
+  ui: "客戶端",
+  infra: "基礎設施",
+  external: "外部服務",
+};
+
+const CATEGORY_EN: Record<string, string> = {
+  core: "Core",
+  api: "API",
+  data: "Data",
+  ui: "Client",
+  infra: "Infrastructure",
+  external: "External",
+};
+
+// --- Layer background color (subtle, based on category) ---
+const layerBg = (cat: ModuleCategory): string => {
+  const c = MODULE_COLORS[cat].base;
+  return `${c}0A`; // very faint tint
+};
+
+const layerBorder = (cat: ModuleCategory): string => {
+  const c = MODULE_COLORS[cat].base;
+  return `${c}30`;
+};
+
+// --- Helpers ---
 
 const getModuleColors = (
   mod: ModuleDefinition,
@@ -51,33 +75,30 @@ const getModuleColors = (
   progress: number,
 ) => {
   if (highlightModules.includes(mod.id)) {
+    const catColor = MODULE_COLORS[mod.category];
     return {
-      fill: interpolateColors(
-        progress,
-        [0, 1],
-        [GRAY.base, MODULE_COLORS[mod.category].base],
-      ),
-      stroke: interpolateColors(
-        progress,
-        [0, 1],
-        [GRAY.light, MODULE_COLORS[mod.category].light],
-      ),
-      text: interpolateColors(progress, [0, 1], [THEME.muted, "#FFFFFF"]),
+      fill: interpolateColors(progress, [0, 1], ["#1E293B", catColor.base + "22"]),
+      stroke: interpolateColors(progress, [0, 1], ["#334155", catColor.light]),
+      text: interpolateColors(progress, [0, 1], [THEME.muted, THEME.text]),
+      labelColor: interpolateColors(progress, [0, 1], [THEME.muted, catColor.light]),
     };
   }
 
   if (coloredModules.includes(mod.id)) {
+    const catColor = MODULE_COLORS[mod.category];
     return {
-      fill: MODULE_COLORS[mod.category].base,
-      stroke: MODULE_COLORS[mod.category].light,
-      text: "#FFFFFF",
+      fill: catColor.base + "22",
+      stroke: catColor.light,
+      text: THEME.text,
+      labelColor: catColor.light,
     };
   }
 
   return {
-    fill: GRAY.base,
-    stroke: GRAY.light,
+    fill: "#1E293B",
+    stroke: "#334155",
     text: THEME.muted,
+    labelColor: THEME.muted,
   };
 };
 
@@ -102,55 +123,85 @@ export const ArchitectureDiagram: React.FC<ArchitectureDiagramProps> = ({
     config: { damping: 200 },
   });
 
-  // Compute grid dimensions
-  const maxRow = Math.max(...architecture.modules.map((m) => m.position.row));
-  const maxCol = Math.max(...architecture.modules.map((m) => m.position.col));
-  const gridCols = maxCol + 1;
-  const gridRows = maxRow + 1;
-
-  // Adaptive sizing: compute module dimensions based on available space
-  const availWidth = width - 2 * PADDING;
-  const availHeight = height - TITLE_HEIGHT - 2 * PADDING;
-
-  const maxCellWidth = availWidth / gridCols;
-  const maxCellHeight = availHeight / gridRows;
-
-  const moduleWidth = Math.max(
-    MIN_MODULE_WIDTH,
-    Math.min(BASE_MODULE_WIDTH, maxCellWidth * 0.7),
-  );
-  const moduleHeight = Math.max(
-    MIN_MODULE_HEIGHT,
-    Math.min(BASE_MODULE_HEIGHT, maxCellHeight * 0.6),
-  );
-  const gapX = Math.max(0, Math.min(BASE_GAP_X, maxCellWidth - moduleWidth));
-  const gapY = Math.max(0, Math.min(BASE_GAP_Y, maxCellHeight - moduleHeight));
-
-  const cellWidth = moduleWidth + gapX;
-  const cellHeight = moduleHeight + gapY;
-  const gridWidth = gridCols * cellWidth - gapX;
-  const gridHeight = gridRows * cellHeight - gapY;
-
-  const offsetX = (width - gridWidth) / 2;
-  const offsetY = TITLE_HEIGHT + (height - TITLE_HEIGHT - gridHeight) / 2;
-
-  // Build module grid-position lookup for manhattan distance calculation
-  const modulePositions = new Map<string, { row: number; col: number }>();
+  // --- Group modules by category (preserve order of first appearance) ---
+  const categoryOrder: ModuleCategory[] = [];
+  const categoryModules = new Map<ModuleCategory, ModuleDefinition[]>();
   for (const mod of architecture.modules) {
-    modulePositions.set(mod.id, mod.position);
+    if (!categoryModules.has(mod.category)) {
+      categoryOrder.push(mod.category);
+      categoryModules.set(mod.category, []);
+    }
+    categoryModules.get(mod.category)!.push(mod);
   }
 
-  // Build a lookup for module positions (center points)
-  const moduleCenters = new Map<string, { cx: number; cy: number }>();
-  for (const mod of architecture.modules) {
-    const pos = getModulePosition(mod, cellWidth, cellHeight, offsetX, offsetY);
-    moduleCenters.set(mod.id, {
-      cx: pos.x + moduleWidth / 2,
-      cy: pos.y + moduleHeight / 2,
+  // --- Compute grid layout per category row ---
+  // Each category becomes a horizontal "layer row"
+  // Modules within a category are arranged in a single row
+
+  // Compute layer dimensions
+  type LayerInfo = {
+    category: ModuleCategory;
+    modules: ModuleDefinition[];
+    x: number;
+    y: number;
+    w: number;
+    h: number;
+    modulePositions: Array<{ mod: ModuleDefinition; x: number; y: number }>;
+  };
+
+  const layers: LayerInfo[] = [];
+  let currentY = TITLE_HEIGHT + PADDING;
+
+  for (const cat of categoryOrder) {
+    const mods = categoryModules.get(cat) ?? [];
+    const cols = mods.length;
+
+    // Module area width (modules + gaps between them)
+    const moduleAreaW = cols * MODULE_W + (cols - 1) * GAP_X;
+    const layerW = Math.max(moduleAreaW + 2 * LAYER_PAD_X, 300);
+
+    // Center the layer horizontally
+    const layerX = (width - layerW) / 2;
+    const layerH = LAYER_PAD_Y + MODULE_H + LAYER_PAD_BOTTOM;
+
+    // Position modules within the layer
+    const moduleStartX = layerX + (layerW - moduleAreaW) / 2;
+    const moduleY = currentY + LAYER_PAD_Y;
+    const modulePositions = mods.map((mod, i) => ({
+      mod,
+      x: moduleStartX + i * (MODULE_W + GAP_X),
+      y: moduleY,
+    }));
+
+    layers.push({
+      category: cat,
+      modules: mods,
+      x: layerX,
+      y: currentY,
+      w: layerW,
+      h: layerH,
+      modulePositions,
     });
+
+    currentY += layerH + GAP_Y;
   }
 
-  // Determine if a module is "active" (colored or highlighted after animation)
+  // Scale everything to fit viewport if needed
+  const totalContentH = currentY - GAP_Y + PADDING;
+  const scale = totalContentH > height ? height / totalContentH : 1;
+  const translateY = scale < 1 ? 0 : (height - totalContentH) / 2;
+
+  // Build module center lookup (for connections)
+  const moduleCenters = new Map<string, { cx: number; cy: number }>();
+  for (const layer of layers) {
+    for (const mp of layer.modulePositions) {
+      moduleCenters.set(mp.mod.id, {
+        cx: mp.x + MODULE_W / 2,
+        cy: mp.y + MODULE_H / 2,
+      });
+    }
+  }
+
   const isModuleActive = (id: string) =>
     coloredModules.includes(id) ||
     (highlightModules.includes(id) && frame >= animationStartFrame);
@@ -162,114 +213,99 @@ export const ArchitectureDiagram: React.FC<ArchitectureDiagramProps> = ({
         width={width}
         height={height}
       >
-        {/* Arrowhead marker */}
-        <defs>
-          <marker
-            id="arrowhead"
-            markerWidth="8"
-            markerHeight="6"
-            refX="8"
-            refY="3"
-            orient="auto"
+        <g transform={`translate(0, ${translateY}) scale(${scale})`}>
+          {/* Arrowhead markers */}
+          <defs>
+            <marker id="arrow" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+              <polygon points="0 0, 10 3.5, 0 7" fill={THEME.muted} />
+            </marker>
+            <marker id="arrow-active" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+              <polygon points="0 0, 10 3.5, 0 7" fill={THEME.accent} />
+            </marker>
+            <filter id="card-shadow" x="-4%" y="-4%" width="108%" height="116%">
+              <feDropShadow dx="0" dy="2" stdDeviation="4" floodColor="#000000" floodOpacity="0.3" />
+            </filter>
+          </defs>
+
+          {/* Title */}
+          <text
+            x={width / scale / 2}
+            y={PADDING - 10}
+            textAnchor="middle"
+            fill={THEME.text}
+            fontSize={30}
+            fontFamily="Inter, system-ui, sans-serif"
+            fontWeight={700}
           >
-            <polygon points="0 0, 8 3, 0 6" fill={THEME.muted} />
-          </marker>
-          <marker
-            id="arrowhead-active"
-            markerWidth="8"
-            markerHeight="6"
-            refX="8"
-            refY="3"
-            orient="auto"
-          >
-            <polygon points="0 0, 8 3, 0 6" fill={THEME.accent} />
-          </marker>
-        </defs>
+            {architecture.title}
+          </text>
 
-        {/* Title */}
-        <text
-          x={width / 2}
-          y={40}
-          textAnchor="middle"
-          fill={THEME.text}
-          fontSize={24}
-          fontFamily="Inter, system-ui, sans-serif"
-          fontWeight={600}
-        >
-          {architecture.title}
-        </text>
+          {/* Layer containers */}
+          {layers.map((layer) => (
+            <g key={`layer-${layer.category}`}>
+              {/* Layer background */}
+              <rect
+                x={layer.x}
+                y={layer.y}
+                width={layer.w}
+                height={layer.h}
+                rx={12}
+                fill={layerBg(layer.category)}
+                stroke={layerBorder(layer.category)}
+                strokeWidth={1.5}
+                strokeDasharray="6 3"
+              />
+              {/* Layer label — Chinese */}
+              <text
+                x={layer.x + 16}
+                y={layer.y + 20}
+                fill={MODULE_COLORS[layer.category].light}
+                fontSize={15}
+                fontFamily="Inter, system-ui, sans-serif"
+                fontWeight={700}
+              >
+                {CATEGORY_CN[layer.category] ?? layer.category}
+              </text>
+              {/* Layer label — English */}
+              <text
+                x={layer.x + 16}
+                y={layer.y + 36}
+                fill={THEME.muted}
+                fontSize={11}
+                fontFamily="Inter, system-ui, sans-serif"
+                fontWeight={400}
+              >
+                {CATEGORY_EN[layer.category] ?? layer.category}
+              </text>
+            </g>
+          ))}
 
-        {/* Connection lines (rendered below modules) */}
-        {architecture.connections.map((conn) => {
-          const source = moduleCenters.get(conn.from);
-          const target = moduleCenters.get(conn.to);
-          if (!source || !target) return null;
+          {/* Connection lines (below modules) */}
+          {architecture.connections.map((conn) => {
+            const source = moduleCenters.get(conn.from);
+            const target = moduleCenters.get(conn.to);
+            if (!source || !target) return null;
 
-          const bothActive =
-            isModuleActive(conn.from) && isModuleActive(conn.to);
-          const lineColor = bothActive ? THEME.accent : THEME.muted;
-          const markerId = bothActive
-            ? "url(#arrowhead-active)"
-            : "url(#arrowhead)";
+            const bothActive = isModuleActive(conn.from) && isModuleActive(conn.to);
+            const lineColor = bothActive ? THEME.accent : THEME.muted;
+            const markerId = bothActive ? "url(#arrow-active)" : "url(#arrow)";
+            const lineOpacity = bothActive ? 0.8 : 0.4;
 
-          // Compute manhattan distance for curve decision
-          const fromPos = modulePositions.get(conn.from);
-          const toPos = modulePositions.get(conn.to);
-          const manhattan =
-            fromPos && toPos
-              ? Math.abs(fromPos.row - toPos.row) +
-                Math.abs(fromPos.col - toPos.col)
-              : 0;
-
-          // Connection label renderer
-          const renderLabel = (lx: number, ly: number) => {
-            if (!conn.label) return null;
-            const labelPadding = 4;
-            const estimatedWidth = conn.label.length * 6 + labelPadding * 2;
-            return (
-              <>
-                <rect
-                  x={lx - estimatedWidth / 2}
-                  y={ly - 8}
-                  width={estimatedWidth}
-                  height={16}
-                  fill={THEME.bg}
-                  rx={3}
-                />
-                <text
-                  x={lx}
-                  y={ly + 4}
-                  textAnchor="middle"
-                  fill={lineColor}
-                  fontSize={10}
-                  fontFamily="Inter, system-ui, sans-serif"
-                  fontWeight={500}
-                >
-                  {conn.label}
-                </text>
-              </>
-            );
-          };
-
-          if (manhattan > 2) {
-            // Quadratic bezier for long-distance connections
-            const midX = (source.cx + target.cx) / 2;
-            const midY = (source.cy + target.cy) / 2;
+            // Connection path: use slight curve for all
             const dx = target.cx - source.cx;
             const dy = target.cy - source.cy;
-            const len = Math.sqrt(dx * dx + dy * dy);
-            const offsetAmount = len * 0.3;
-            // Perpendicular direction (counter-clockwise 90°)
-            const nx = -dy / len;
-            const ny = dx / len;
-            const cpx = midX + nx * offsetAmount;
-            const cpy = midY + ny * offsetAmount;
+            const midX = (source.cx + target.cx) / 2;
+            const midY = (source.cy + target.cy) / 2;
 
-            // Bezier midpoint at t=0.5
-            const labelX =
-              0.25 * source.cx + 0.5 * cpx + 0.25 * target.cx;
-            const labelY =
-              0.25 * source.cy + 0.5 * cpy + 0.25 * target.cy;
+            // Offset control point perpendicular to line
+            const len = Math.sqrt(dx * dx + dy * dy);
+            const curvature = len > 400 ? 0.15 : 0.08;
+            const cpx = midX + (-dy / len) * len * curvature;
+            const cpy = midY + (dx / len) * len * curvature;
+
+            // Label position
+            const labelX = 0.25 * source.cx + 0.5 * cpx + 0.25 * target.cx;
+            const labelY = 0.25 * source.cy + 0.5 * cpy + 0.25 * target.cy;
 
             return (
               <g key={`${conn.from}-${conn.to}`}>
@@ -279,127 +315,115 @@ export const ArchitectureDiagram: React.FC<ArchitectureDiagramProps> = ({
                   strokeWidth={2}
                   fill="none"
                   markerEnd={markerId}
-                  opacity={0.6}
+                  opacity={lineOpacity}
                 />
-                {renderLabel(labelX, labelY)}
+                {conn.label && (
+                  <>
+                    <rect
+                      x={labelX - conn.label.length * 4 - 6}
+                      y={labelY - 10}
+                      width={conn.label.length * 8 + 12}
+                      height={20}
+                      fill={THEME.bg}
+                      rx={4}
+                      opacity={0.9}
+                    />
+                    <text
+                      x={labelX}
+                      y={labelY + 4}
+                      textAnchor="middle"
+                      fill={lineColor}
+                      fontSize={11}
+                      fontFamily="Inter, system-ui, sans-serif"
+                      fontWeight={600}
+                      opacity={0.9}
+                    >
+                      {conn.label}
+                    </text>
+                  </>
+                )}
               </g>
             );
-          }
+          })}
 
-          // Straight line for short-distance connections
-          const labelMidX = (source.cx + target.cx) / 2;
-          const labelMidY = (source.cy + target.cy) / 2;
+          {/* Module cards */}
+          {layers.map((layer) =>
+            layer.modulePositions.map(({ mod, x, y }) => {
+              const colors = getModuleColors(mod, coloredModules, highlightModules, progress);
 
-          return (
-            <g key={`${conn.from}-${conn.to}`}>
-              <line
-                x1={source.cx}
-                y1={source.cy}
-                x2={target.cx}
-                y2={target.cy}
-                stroke={lineColor}
-                strokeWidth={2}
-                markerEnd={markerId}
-                opacity={0.6}
-              />
-              {renderLabel(labelMidX, labelMidY)}
-            </g>
-          );
-        })}
+              // Category accent bar color
+              const accentColor = coloredModules.includes(mod.id) || highlightModules.includes(mod.id)
+                ? interpolateColors(progress, [0, 1], [THEME.muted, MODULE_COLORS[mod.category].base])
+                : THEME.muted;
 
-        {/* Module rects + labels */}
-        {architecture.modules.map((mod) => {
-          const pos = getModulePosition(
-            mod,
-            cellWidth,
-            cellHeight,
-            offsetX,
-            offsetY,
-          );
-          const colors = getModuleColors(
-            mod,
-            coloredModules,
-            highlightModules,
-            progress,
-          );
-
-          // Adaptive font size based on label length and module width
-          const baseFontSize = 14;
-          const maxChars = moduleWidth / (baseFontSize * 0.6);
-          const labelFontSize =
-            mod.label.length > maxChars
-              ? Math.max(10, baseFontSize * (maxChars / mod.label.length))
-              : baseFontSize;
-
-          const baseDescFontSize = 10;
-          const maxDescChars = moduleWidth / (baseDescFontSize * 0.6);
-          const descFontSize =
-            mod.description && mod.description.length > maxDescChars
-              ? Math.max(
-                  7,
-                  baseDescFontSize * (maxDescChars / mod.description.length),
-                )
-              : baseDescFontSize;
-
-          return (
-            <g key={mod.id}>
-              <rect
-                x={pos.x}
-                y={pos.y}
-                width={moduleWidth}
-                height={moduleHeight}
-                rx={8}
-                ry={8}
-                fill={colors.fill}
-                stroke={colors.stroke}
-                strokeWidth={2}
-              />
-              <text
-                x={pos.x + moduleWidth / 2}
-                y={
-                  pos.y +
-                  moduleHeight / 2 +
-                  (showDescriptions && mod.description ? -6 : 5)
-                }
-                textAnchor="middle"
-                fill={colors.text}
-                fontSize={labelFontSize}
-                fontFamily="Inter, system-ui, sans-serif"
-                fontWeight={600}
-              >
-                {mod.label}
-              </text>
-              {showDescriptions && mod.description && (
-                <text
-                  x={pos.x + moduleWidth / 2}
-                  y={pos.y + moduleHeight / 2 + 14}
-                  textAnchor="middle"
-                  fill={colors.text}
-                  fontSize={descFontSize}
-                  fontFamily="Inter, system-ui, sans-serif"
-                  fontWeight={400}
-                  opacity={0.8}
-                >
-                  {mod.description}
-                </text>
-              )}
-              {moduleAnnotations?.[mod.id] && (
-                <text
-                  x={pos.x + moduleWidth / 2}
-                  y={pos.y + moduleHeight + 16}
-                  textAnchor="middle"
-                  fill={THEME.text}
-                  fontSize={11}
-                  fontFamily="Inter, system-ui, sans-serif"
-                  fontWeight={400}
-                  opacity={0.8}
-                >
-                  {moduleAnnotations[mod.id]}
-                </text>
-              )}
-            </g>
-          );
-        })}
+              return (
+                <g key={mod.id} filter="url(#card-shadow)">
+                  {/* Card background */}
+                  <rect
+                    x={x}
+                    y={y}
+                    width={MODULE_W}
+                    height={MODULE_H}
+                    rx={10}
+                    fill={colors.fill}
+                    stroke={colors.stroke}
+                    strokeWidth={1.5}
+                  />
+                  {/* Left accent bar */}
+                  <rect
+                    x={x}
+                    y={y}
+                    width={4}
+                    height={MODULE_H}
+                    rx={2}
+                    fill={accentColor}
+                  />
+                  {/* Module label */}
+                  <text
+                    x={x + 18}
+                    y={y + (mod.description || showDescriptions ? 28 : MODULE_H / 2 + 6)}
+                    fill={colors.labelColor}
+                    fontSize={15}
+                    fontFamily="Inter, system-ui, sans-serif"
+                    fontWeight={700}
+                  >
+                    {mod.label}
+                  </text>
+                  {/* Module description */}
+                  {(showDescriptions || mod.description) && mod.description && (
+                    <text
+                      x={x + 18}
+                      y={y + 48}
+                      fill={colors.text}
+                      fontSize={11}
+                      fontFamily="Inter, system-ui, sans-serif"
+                      fontWeight={400}
+                      opacity={0.7}
+                    >
+                      {mod.description.length > 28
+                        ? mod.description.slice(0, 26) + "…"
+                        : mod.description}
+                    </text>
+                  )}
+                  {/* Business annotation */}
+                  {moduleAnnotations?.[mod.id] && (
+                    <text
+                      x={x + MODULE_W / 2}
+                      y={y + MODULE_H + 16}
+                      textAnchor="middle"
+                      fill={THEME.accent}
+                      fontSize={11}
+                      fontFamily="Inter, system-ui, sans-serif"
+                      fontWeight={600}
+                    >
+                      {moduleAnnotations[mod.id]}
+                    </text>
+                  )}
+                </g>
+              );
+            }),
+          )}
+        </g>
       </svg>
     </AbsoluteFill>
   );
