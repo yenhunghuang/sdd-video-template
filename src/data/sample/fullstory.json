@@ -1,0 +1,76 @@
+{
+  "type": "fullstory",
+  "projectName": "TaskFlow",
+  "tagline": "AI-powered project management for modern teams",
+  "principles": [
+    {
+      "title": "資料驅動",
+      "description": "所有決策基於真實使用數據，不靠猜測"
+    },
+    {
+      "title": "漸進式複雜度",
+      "description": "新用戶 5 分鐘上手，進階功能按需解鎖"
+    },
+    {
+      "title": "離線優先",
+      "description": "核心功能在無網路環境下仍可運作"
+    },
+    {
+      "title": "開放整合",
+      "description": "透過 API 和 webhook 與既有工具無縫連接"
+    },
+    {
+      "title": "隱私至上",
+      "description": "用戶資料端對端加密，絕不用於廣告"
+    }
+  ],
+  "architecture": {
+    "title": "TaskFlow Architecture",
+    "modules": [
+      { "id": "auth", "label": "Auth Service", "description": "JWT authentication and RBAC", "category": "core", "position": { "row": 0, "col": 0 } },
+      { "id": "api", "label": "REST API", "description": "Express.js API gateway", "category": "api", "position": { "row": 0, "col": 1 } },
+      { "id": "db", "label": "PostgreSQL", "description": "Primary data store", "category": "data", "position": { "row": 1, "col": 0 } },
+      { "id": "cache", "label": "Redis Cache", "description": "Session and query cache", "category": "data", "position": { "row": 1, "col": 1 } },
+      { "id": "web", "label": "React SPA", "description": "Main web application", "category": "ui", "position": { "row": 0, "col": 2 } },
+      { "id": "worker", "label": "Background Jobs", "description": "Task scheduling and notifications", "category": "infra", "position": { "row": 1, "col": 2 } }
+    ],
+    "connections": [
+      { "from": "web", "to": "api", "label": "HTTP" },
+      { "from": "api", "to": "auth", "label": "verify" },
+      { "from": "api", "to": "db", "label": "query" },
+      { "from": "api", "to": "cache", "label": "read/write" },
+      { "from": "worker", "to": "db", "label": "poll" },
+      { "from": "worker", "to": "cache", "label": "invalidate" }
+    ]
+  },
+  "taskSummary": {
+    "total": 42,
+    "categories": [
+      { "name": "Setup & Infrastructure", "count": 8 },
+      { "name": "Core Features", "count": 24 },
+      { "name": "Polish & Testing", "count": 10 }
+    ]
+  },
+  "targetUsers": ["全端工程師", "技術主管", "專案經理"],
+  "iterations": [
+    {
+      "iterationNumber": "001",
+      "changeName": "add-user-authentication",
+      "summary": "實作 JWT 認證系統和角色權限控管",
+      "motivation": "用戶需要安全的登入機制，且不同角色需要不同的操作權限，這是所有後續功能的基礎。",
+      "specDiff": {
+        "before": "API endpoints 無認證保護，任何人可存取所有資源",
+        "after": "所有 API endpoints 需要 JWT token 驗證，支援 admin / member / viewer 三種角色權限"
+      },
+      "tasks": [
+        { "id": "T-009", "title": "Setup JWT token signing and verification", "status": "completed" },
+        { "id": "T-010", "title": "Implement user registration endpoint", "status": "completed" },
+        { "id": "T-011", "title": "Implement login/logout endpoints", "status": "completed" },
+        { "id": "T-012", "title": "Add RBAC middleware for role-based access", "status": "completed" },
+        { "id": "T-013", "title": "Add OAuth2 social login (Google, GitHub)", "status": "skipped" }
+      ],
+      "coloredModules": ["auth", "api"],
+      "highlightModules": ["api"]
+    }
+  ]
+}

@@ -123,6 +123,50 @@ export const SprintDataSchema = z.object({
   coloredModules: z.array(z.string()),
 });
 
+export const FullStoryIterationSchema = z.object({
+  iterationNumber: z.string(),
+  changeName: z.string(),
+  summary: z.string(),
+  motivation: z.string(),
+  specDiff: z.object({
+    before: z.string(),
+    after: z.string(),
+  }),
+  tasks: z.array(
+    z.object({
+      id: z.string(),
+      title: z.string(),
+      status: z.enum(["completed", "skipped"]),
+    }),
+  ),
+  coloredModules: z.array(z.string()),
+  highlightModules: z.array(z.string()),
+});
+
+export const FullStoryDataSchema = z.object({
+  type: z.literal("fullstory"),
+  projectName: z.string(),
+  tagline: z.string(),
+  principles: z.array(
+    z.object({
+      title: z.string(),
+      description: z.string(),
+    }),
+  ),
+  architecture: ArchitectureDefinitionSchema,
+  taskSummary: z.object({
+    total: z.number(),
+    categories: z.array(
+      z.object({
+        name: z.string(),
+        count: z.number(),
+      }),
+    ),
+  }),
+  targetUsers: z.array(z.string()),
+  iterations: z.array(FullStoryIterationSchema),
+});
+
 // --- Inferred types ---
 
 export type ModuleCategory = z.infer<typeof ModuleCategorySchema>;
@@ -134,3 +178,5 @@ export type GenesisData = z.infer<typeof GenesisDataSchema>;
 export type IterationData = z.infer<typeof IterationDataSchema>;
 export type EvolutionData = z.infer<typeof EvolutionDataSchema>;
 export type SprintData = z.infer<typeof SprintDataSchema>;
+export type FullStoryIteration = z.infer<typeof FullStoryIterationSchema>;
+export type FullStoryData = z.infer<typeof FullStoryDataSchema>;

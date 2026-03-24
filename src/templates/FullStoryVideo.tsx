@@ -10,24 +10,35 @@ import {
 import { TransitionSeries, linearTiming } from "@remotion/transitions";
 import { fade } from "@remotion/transitions/fade";
 import type { CalculateMetadataFunction } from "remotion";
-import type { GenesisData } from "../types/schemas";
+import type { FullStoryData } from "../types/schemas";
 import { SceneTitle } from "../components/SceneTitle";
 import { TypewriterText } from "../components/TypewriterText";
+import { SpecDiff } from "../components/SpecDiff";
+import { TaskChecklist } from "../components/TaskChecklist";
 import { ArchitectureDiagram } from "../components/ArchitectureDiagram";
 import { CounterAnimation } from "../components/CounterAnimation";
 import { THEME } from "../styles/theme";
 
 const TRANSITION_FRAMES = 15;
+// Genesis section
 const TITLE_FRAMES = 180;
 const PRINCIPLE_STAGGER = 120;
 const ARCH_FRAMES = 270;
 const TASK_FRAMES = 180;
-const OUTRO_FRAMES = 150;
+// Iteration section
+const ITER_TITLE_FRAMES = 90;
+const SPEC_DIFF_FRAMES = 150;
+const ITER_ARCH_FRAMES = 120;
+const TASK_STAGGER = 15;
+const TASK_BASE = 60;
+// FullStory specific
+const SEPARATOR_FRAMES = 60;
+const FINAL_OUTRO_FRAMES = 150;
 
 // --- Sub-scenes ---
 
 const PrinciplesScene: React.FC<{
-  principles: GenesisData["principles"];
+  principles: FullStoryData["principles"];
   stagger: number;
 }> = ({ principles, stagger }) => {
   const frame = useCurrentFrame();
@@ -103,7 +114,7 @@ const PrinciplesScene: React.FC<{
 };
 
 const TaskSummaryScene: React.FC<{
-  taskSummary: GenesisData["taskSummary"];
+  taskSummary: FullStoryData["taskSummary"];
 }> = ({ taskSummary }) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
@@ -172,11 +183,100 @@ const TaskSummaryScene: React.FC<{
 
 // --- Main component ---
 
-export const GenesisVideo: React.FC<GenesisData> = (props) => {
+export const FullStoryVideo: React.FC<FullStoryData> = (props) => {
   const principlesDuration = props.principles.length * PRINCIPLE_STAGGER + 60;
+
+  const iterationElements = props.iterations.flatMap((iteration, i) => {
+    const tasksDuration = iteration.tasks.length * TASK_STAGGER + TASK_BASE;
+    return [
+      <TransitionSeries.Transition
+        key={`trans-sep-${i}`}
+        presentation={fade()}
+        timing={linearTiming({ durationInFrames: TRANSITION_FRAMES })}
+      />,
+      <TransitionSeries.Sequence key={`sep-${i}`} durationInFrames={SEPARATOR_FRAMES}>
+        <SceneTitle title={`#${iteration.iterationNumber}`} subtitle={iteration.changeName} />
+      </TransitionSeries.Sequence>,
+      <TransitionSeries.Transition
+        key={`trans-title-${i}`}
+        presentation={fade()}
+        timing={linearTiming({ durationInFrames: TRANSITION_FRAMES })}
+      />,
+      <TransitionSeries.Sequence key={`title-${i}`} durationInFrames={ITER_TITLE_FRAMES}>
+        <SceneTitle
+          title={`#${iteration.iterationNumber} ${iteration.changeName}`}
+          subtitle={iteration.summary}
+        />
+      </TransitionSeries.Sequence>,
+      <TransitionSeries.Transition
+        key={`trans-diff-${i}`}
+        presentation={fade()}
+        timing={linearTiming({ durationInFrames: TRANSITION_FRAMES })}
+      />,
+      <TransitionSeries.Sequence key={`diff-${i}`} durationInFrames={SPEC_DIFF_FRAMES}>
+        <AbsoluteFill
+          style={{
+            backgroundColor: THEME.bg,
+            justifyContent: "center",
+            alignItems: "center",
+          }}
+        >
+          <SpecDiff
+            before={iteration.specDiff.before}
+            after={iteration.specDiff.after}
+            transitionFrame={Math.floor(SPEC_DIFF_FRAMES / 2)}
+            style={{ maxWidth: 1200 }}
+          />
+        </AbsoluteFill>
+      </TransitionSeries.Sequence>,
+      <TransitionSeries.Transition
+        key={`trans-tasks-${i}`}
+        presentation={fade()}
+        timing={linearTiming({ durationInFrames: TRANSITION_FRAMES })}
+      />,
+      <TransitionSeries.Sequence key={`tasks-${i}`} durationInFrames={tasksDuration}>
+        <AbsoluteFill
+          style={{
+            backgroundColor: THEME.bg,
+            justifyContent: "center",
+            alignItems: "center",
+            padding: "80px 200px",
+          }}
+        >
+          <div
+            style={{
+              color: THEME.muted,
+              fontSize: 18,
+              letterSpacing: 3,
+              marginBottom: 32,
+              textTransform: "uppercase",
+              alignSelf: "flex-start",
+            }}
+          >
+            Completed Tasks
+          </div>
+          <TaskChecklist tasks={iteration.tasks} staggerDelay={TASK_STAGGER} />
+        </AbsoluteFill>
+      </TransitionSeries.Sequence>,
+      <TransitionSeries.Transition
+        key={`trans-arch-${i}`}
+        presentation={fade()}
+        timing={linearTiming({ durationInFrames: TRANSITION_FRAMES })}
+      />,
+      <TransitionSeries.Sequence key={`arch-${i}`} durationInFrames={ITER_ARCH_FRAMES}>
+        <ArchitectureDiagram
+          architecture={props.architecture}
+          coloredModules={iteration.coloredModules}
+          highlightModules={iteration.highlightModules}
+          animationStartFrame={15}
+        />
+      </TransitionSeries.Sequence>,
+    ];
+  });
 
   return (
     <TransitionSeries>
+      {/* Genesis Title */}
       <TransitionSeries.Sequence durationInFrames={TITLE_FRAMES}>
         <SceneTitle title={props.projectName} subtitle={props.tagline} />
       </TransitionSeries.Sequence>
@@ -186,6 +286,7 @@ export const GenesisVideo: React.FC<GenesisData> = (props) => {
         timing={linearTiming({ durationInFrames: TRANSITION_FRAMES })}
       />
 
+      {/* Genesis Principles */}
       <TransitionSeries.Sequence durationInFrames={principlesDuration}>
         <PrinciplesScene
           principles={props.principles}
@@ -198,6 +299,7 @@ export const GenesisVideo: React.FC<GenesisData> = (props) => {
         timing={linearTiming({ durationInFrames: TRANSITION_FRAMES })}
       />
 
+      {/* Genesis Architecture */}
       <TransitionSeries.Sequence durationInFrames={ARCH_FRAMES}>
         <ArchitectureDiagram
           architecture={props.architecture}
@@ -213,35 +315,64 @@ export const GenesisVideo: React.FC<GenesisData> = (props) => {
         timing={linearTiming({ durationInFrames: TRANSITION_FRAMES })}
       />
 
+      {/* Genesis Task Summary */}
       <TransitionSeries.Sequence durationInFrames={TASK_FRAMES}>
         <TaskSummaryScene taskSummary={props.taskSummary} />
       </TransitionSeries.Sequence>
+
+      {/* Iterations */}
+      {iterationElements}
 
       <TransitionSeries.Transition
         presentation={fade()}
         timing={linearTiming({ durationInFrames: TRANSITION_FRAMES })}
       />
 
-      <TransitionSeries.Sequence durationInFrames={OUTRO_FRAMES}>
-        <SceneTitle
-          title="Ready to Build"
-          subtitle={props.targetUsers.join(" · ")}
-        />
+      {/* Final Outro */}
+      <TransitionSeries.Sequence durationInFrames={FINAL_OUTRO_FRAMES}>
+        <SceneTitle title={props.projectName} subtitle="Project Evolution Complete" />
       </TransitionSeries.Sequence>
     </TransitionSeries>
   );
 };
 
-export const calculateGenesisMetadata: CalculateMetadataFunction<
-  GenesisData
+export const calculateFullStoryMetadata: CalculateMetadataFunction<
+  FullStoryData
 > = async ({ props }) => {
   const principlesDuration = props.principles.length * PRINCIPLE_STAGGER + 60;
-  const totalScenes =
-    TITLE_FRAMES + principlesDuration + ARCH_FRAMES + TASK_FRAMES + OUTRO_FRAMES;
-  const totalTransitions = 4 * TRANSITION_FRAMES;
+
+  // Genesis section: title + principles + arch + tasks
+  const genesisScenes =
+    TITLE_FRAMES + principlesDuration + ARCH_FRAMES + TASK_FRAMES;
+  const genesisTransitions = 3 * TRANSITION_FRAMES;
+
+  // Each iteration: separator + title + specDiff + tasks + arch
+  let iterationTotal = 0;
+  for (const it of props.iterations) {
+    const tasksDuration = it.tasks.length * TASK_STAGGER + TASK_BASE;
+    const iterScenes =
+      SEPARATOR_FRAMES +
+      ITER_TITLE_FRAMES +
+      SPEC_DIFF_FRAMES +
+      tasksDuration +
+      ITER_ARCH_FRAMES;
+    const iterTransitions = 4 * TRANSITION_FRAMES;
+    iterationTotal += iterScenes - iterTransitions;
+  }
+
+  // Transitions between sections
+  const sectionTransitions =
+    (props.iterations.length + 1) * TRANSITION_FRAMES;
+
+  const totalDuration =
+    genesisScenes -
+    genesisTransitions +
+    iterationTotal +
+    FINAL_OUTRO_FRAMES -
+    sectionTransitions;
 
   return {
-    durationInFrames: totalScenes - totalTransitions,
-    defaultOutName: "000-genesis-genesis",
+    durationInFrames: totalDuration,
+    defaultOutName: `${props.projectName.toLowerCase().replace(/\s+/g, "-")}-full-story`,
   };
 };

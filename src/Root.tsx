@@ -1,6 +1,6 @@
 import "./index.css";
 import { Composition } from "remotion";
-import { GenesisDataSchema, IterationDataSchema } from "./types/schemas";
+import { GenesisDataSchema, IterationDataSchema, FullStoryDataSchema } from "./types/schemas";
 import {
   GenesisVideo,
   calculateGenesisMetadata,
@@ -9,12 +9,18 @@ import {
   IterationVideo,
   calculateIterationMetadata,
 } from "./templates/IterationVideo";
-import type { GenesisData, IterationData } from "./types/schemas";
+import {
+  FullStoryVideo,
+  calculateFullStoryMetadata,
+} from "./templates/FullStoryVideo";
+import type { GenesisData, IterationData, FullStoryData } from "./types/schemas";
 import _genesisData from "./data/sample/genesis.json";
 import _iterationData from "./data/sample/iteration-001.json";
+import _fullStoryData from "./data/sample/fullstory.json";
 
 const genesisData = _genesisData as unknown as GenesisData;
 const iterationData = _iterationData as unknown as IterationData;
+const fullStoryData = _fullStoryData as unknown as FullStoryData;
 
 export const RemotionRoot: React.FC = () => {
   return (
@@ -40,6 +46,17 @@ export const RemotionRoot: React.FC = () => {
         schema={IterationDataSchema}
         defaultProps={iterationData}
         calculateMetadata={calculateIterationMetadata}
+      />
+      <Composition
+        id="FullStoryVideo"
+        component={FullStoryVideo}
+        fps={30}
+        width={1920}
+        height={1080}
+        durationInFrames={2400}
+        schema={FullStoryDataSchema}
+        defaultProps={fullStoryData}
+        calculateMetadata={calculateFullStoryMetadata}
       />
     </>
   );

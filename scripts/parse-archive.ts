@@ -1,4 +1,4 @@
-import { existsSync } from "fs";
+import { existsSync, mkdirSync, readdirSync, statSync } from "fs";
 import { basename, join } from "path";
 import { parseArgs } from "util";
 import matter from "gray-matter";
@@ -29,37 +29,6 @@ if (!existsSync(inputDir)) {
   console.error(`Error: Directory not found: ${inputDir}`);
   process.exit(1);
 }
-
-// --- Validate directory name format ---
-const dirName = basename(inputDir);
-const nnnMatch = dirName.match(/^(\d{3})-/);
-if (!nnnMatch) {
-  console.error(
-    `Error: Directory name must start with NNN- format: ${dirName}`
-  );
-  process.exit(1);
-}
-const nnn = nnnMatch[1];
-const isGenesis = nnn === "000";
-
-// --- Validate required files ---
-const requiredFiles = ["proposal.md", "tasks.md", "spec-delta.md"] as const;
-for (const file of requiredFiles) {
-  const filePath = join(inputDir, file);
-  if (!existsSync(filePath)) {
-    console.error(`Error: Required file not found: ${filePath}`);
-    process.exit(1);
-  }
-}
-
-// --- Read and parse files ---
-const proposalRaw = await Bun.file(join(inputDir, "proposal.md")).text();
-const tasksRaw = await Bun.file(join(inputDir, "tasks.md")).text();
-const specDeltaRaw = await Bun.file(join(inputDir, "spec-delta.md")).text();
-
-const proposal = matter(proposalRaw);
-const tasksMd = matter(tasksRaw);
-const specDelta = matter(specDeltaRaw);
 
 // --- Helpers ---
 
@@ -334,81 +303,179 @@ function extractSpecDiff(content: string): { before: string; after: string } {
 
 // --- Build data based on type ---
 
-function outputJson(data: unknown): void {
+function outputJson(data: unknown, output: string | undefined): void {
   const json = JSON.stringify(data, null, 2);
-  if (outputPath) {
-    Bun.write(outputPath, json);
-    console.error(`JSON written to ${outputPath}`);
+  if (output) {
+    Bun.write(output, json);
+    console.error(`JSON written to ${output}`);
   } else {
     console.log(json);
   }
 }
 
-if (isGenesis) {
-  const proposalContent = proposal.content;
-  const specDeltaContent = specDelta.content;
-  const tasksContent = tasksMd.content;
+async function parseSingleDir(
+  dir: string,
+  output: string | undefined,
+  overrideIterationNumber?: string
+): Promise<void> {
+  const dn = basename(dir);
+  const nnn = dn.match(/^(\d{3})-/);
+  const date = dn.match(/^(\d{4}-\d{2}-\d{2})-/);
+  const specKit = !!nnn;
+  const openSpec = !!date;
 
-  const projectName = extractTitle(proposalContent);
-  const tagline = extractTagline(proposalContent);
-  const principles = extractPrinciples(proposalContent);
-  const architecture = extractArchitecture(specDeltaContent);
-  const taskSummary = extractTaskSummary(tasksContent);
-  const targetUsers = extractTargetUsers(proposalContent);
-
-  const data = {
-    type: "genesis" as const,
-    projectName,
-    tagline,
-    principles,
-    architecture,
-    taskSummary,
-    targetUsers,
-  };
-
-  const result = GenesisDataSchema.safeParse(data);
-  if (!result.success) {
-    console.error("Validation failed:", JSON.stringify(result.error.issues, null, 2));
+  if (!specKit && !openSpec) {
+    console.error(
+      `Error: Directory name must start with NNN- (SpecKit) or YYYY-MM-DD- (OpenSpec) format: ${dn}`
+    );
     process.exit(1);
   }
-  outputJson(result.data);
+
+  const genesis = specKit && nnn![1] === "000";
+
+  const sf = openSpec ? "design.md" : "spec-delta.md";
+  const required = ["proposal.md", "tasks.md", sf];
+  for (const file of required) {
+    const filePath = join(dir, file);
+    if (!existsSync(filePath)) {
+      console.error(`Error: Required file not found: ${filePath}`);
+      process.exit(1);
+    }
+  }
+
+  const proposalRaw = await Bun.file(join(dir, "proposal.md")).text();
+  const tasksRaw = await Bun.file(join(dir, "tasks.md")).text();
+  const specDeltaRaw = await Bun.file(join(dir, sf)).text();
+
+  const proposal = matter(proposalRaw);
+  const tasksMd = matter(tasksRaw);
+  const specDelta = matter(specDeltaRaw);
+
+  if (genesis) {
+    const proposalContent = proposal.content;
+    const specDeltaContent = specDelta.content;
+    const tasksContent = tasksMd.content;
+
+    const projectName = extractTitle(proposalContent);
+    const tagline = extractTagline(proposalContent);
+    const principles = extractPrinciples(proposalContent);
+    const architecture = extractArchitecture(specDeltaContent);
+    const taskSummary = extractTaskSummary(tasksContent);
+    const targetUsers = extractTargetUsers(proposalContent);
+
+    const data = {
+      type: "genesis" as const,
+      projectName,
+      tagline,
+      principles,
+      architecture,
+      taskSummary,
+      targetUsers,
+    };
+
+    const result = GenesisDataSchema.safeParse(data);
+    if (!result.success) {
+      console.error("Validation failed:", JSON.stringify(result.error.issues, null, 2));
+      process.exit(1);
+    }
+    outputJson(result.data, output);
+  } else {
+    const proposalContent = proposal.content;
+    const specDeltaContent = specDelta.content;
+    const tasksContent = tasksMd.content;
+
+    const changeName = specKit
+      ? ((proposal.data.changeName as string) ?? dn.replace(/^\d{3}-/, "").replace(/-/g, " "))
+      : ((proposal.data.changeName as string) ?? dn.replace(/^\d{4}-\d{2}-\d{2}-/, "").replace(/-/g, " "));
+    const summary = extractSummary(proposalContent);
+    const motivation = extractMotivation(proposalContent);
+    const specDiff = extractSpecDiff(specDeltaContent);
+    const tasks = extractIterationTasks(tasksContent);
+    const architecture = extractArchitecture(specDeltaContent);
+    const coloredModules =
+      (proposal.data.coloredModules as string[]) ?? [];
+    const highlightModules =
+      (proposal.data.highlightModules as string[]) ?? [];
+
+    const iterationNumber = overrideIterationNumber
+      ?? (specKit ? nnn![1] : "001");
+
+    const data = {
+      type: "iteration" as const,
+      iterationNumber,
+      changeName,
+      summary,
+      motivation,
+      specDiff,
+      tasks,
+      architecture,
+      coloredModules,
+      highlightModules,
+    };
+
+    const result = IterationDataSchema.safeParse(data);
+    if (!result.success) {
+      console.error("Validation failed:", JSON.stringify(result.error.issues, null, 2));
+      process.exit(1);
+    }
+    outputJson(result.data, output);
+  }
+}
+
+// --- Check for batch mode ---
+const entries = readdirSync(inputDir).filter((e) => {
+  const fullPath = join(inputDir, e);
+  return (
+    statSync(fullPath).isDirectory() &&
+    (/^\d{3}-/.test(e) || /^\d{4}-\d{2}-\d{2}-/.test(e))
+  );
+});
+
+const isBatch = entries.length > 0;
+
+if (isBatch) {
+  // Separate genesis and iteration directories
+  const genesisEntries = entries.filter((e) => /^000-/.test(e));
+  const iterEntries = entries.filter((e) => !/^000-/.test(e));
+
+  // Sort iteration entries
+  iterEntries.sort((a, b) => {
+    const aNum = a.match(/^(\d{3})-/);
+    const bNum = b.match(/^(\d{3})-/);
+    if (aNum && bNum) return aNum[1].localeCompare(bNum[1]);
+    // OpenSpec: sort by date string
+    return a.localeCompare(b);
+  });
+
+  if (!outputPath) {
+    console.error("Error: --output directory is required for batch mode");
+    process.exit(1);
+  }
+
+  mkdirSync(outputPath, { recursive: true });
+
+  // Parse genesis
+  for (const entry of genesisEntries) {
+    await parseSingleDir(
+      join(inputDir, entry),
+      join(outputPath, "genesis.json")
+    );
+  }
+
+  // Parse iterations with auto-incrementing numbers
+  for (let i = 0; i < iterEntries.length; i++) {
+    const num = String(i + 1).padStart(3, "0");
+    await parseSingleDir(
+      join(inputDir, iterEntries[i]),
+      join(outputPath, `iteration-${num}.json`),
+      num
+    );
+  }
+
+  console.error(
+    `Batch complete: ${genesisEntries.length} genesis + ${iterEntries.length} iterations`
+  );
+  process.exit(0);
 } else {
-  const proposalContent = proposal.content;
-  const specDeltaContent = specDelta.content;
-  const tasksContent = tasksMd.content;
-
-  const changeName =
-    (proposal.data.changeName as string) ??
-    dirName.replace(/^\d{3}-/, "").replace(/-/g, " ");
-  const summary = extractSummary(proposalContent);
-  const motivation = extractMotivation(proposalContent);
-  const specDiff = extractSpecDiff(specDeltaContent);
-  const tasks = extractIterationTasks(tasksContent);
-  const architecture = extractArchitecture(specDeltaContent);
-  const coloredModules =
-    (proposal.data.coloredModules as string[]) ??
-    [];
-  const highlightModules =
-    (proposal.data.highlightModules as string[]) ??
-    [];
-
-  const data = {
-    type: "iteration" as const,
-    iterationNumber: nnn,
-    changeName,
-    summary,
-    motivation,
-    specDiff,
-    tasks,
-    architecture,
-    coloredModules,
-    highlightModules,
-  };
-
-  const result = IterationDataSchema.safeParse(data);
-  if (!result.success) {
-    console.error("Validation failed:", JSON.stringify(result.error.issues, null, 2));
-    process.exit(1);
-  }
-  outputJson(result.data);
+  await parseSingleDir(inputDir, outputPath);
 }

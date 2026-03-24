@@ -123,6 +123,6 @@ export const calculateIterationMetadata: CalculateMetadataFunction<
 
   return {
     durationInFrames: totalScenes - totalTransitions,
-    defaultOutName: `${props.iterationNumber}-${props.changeName}-iteration.mp4`,
+    defaultOutName: `${props.iterationNumber}-${props.changeName}-iteration`,
   };
 };
