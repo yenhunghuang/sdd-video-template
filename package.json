@@ -1,0 +1,42 @@
+{
+  "name": "sdd-video-template",
+  "version": "1.0.0",
+  "description": "Remotion template for generating SDD (Spec-Driven Development) project evolution videos",
+  "repository": {},
+  "license": "UNLICENSED",
+  "private": true,
+  "keywords": ["remotion", "video", "sdd", "spec-driven-development", "template"],
+  "dependencies": {
+    "@remotion/cli": "4.0.438",
+    "@remotion/tailwind-v4": "4.0.438",
+    "@remotion/transitions": "^4.0.438",
+    "gray-matter": "^4.0.3",
+    "react": "19.2.3",
+    "react-dom": "19.2.3",
+    "remotion": "4.0.438",
+    "tailwindcss": "4.0.0",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@remotion/eslint-config-flat": "4.0.438",
+    "@types/bun": "^1.3.11",
+    "@types/react": "19.2.7",
+    "@types/web": "0.0.166",
+    "eslint": "9.19.0",
+    "prettier": "3.8.1",
+    "typescript": "5.9.3"
+  },
+  "scripts": {
+    "dev": "remotion studio",
+    "build": "remotion bundle",
+    "render": "remotion render",
+    "upgrade": "remotion upgrade",
+    "lint": "eslint src && tsc",
+    "speckit-to-genesis": "bun run scripts/speckit-to-genesis.ts",
+    "parse-archive": "bun run scripts/parse-archive.ts",
+    "init": "bun run scripts/init-template.ts"
+  },
+  "sideEffects": [
+    "*.css"
+  ]
+}
