@@ -18,12 +18,12 @@
   "architecture": {
     "title": "TaskFlow Architecture",
     "modules": [
-      { "id": "auth", "label": "Auth Service", "description": "JWT authentication and RBAC", "category": "core", "position": { "row": 0, "col": 0 } },
-      { "id": "api", "label": "REST API", "description": "Express.js API gateway", "category": "api", "position": { "row": 0, "col": 1 } },
-      { "id": "db", "label": "PostgreSQL", "description": "Primary data store", "category": "data", "position": { "row": 1, "col": 0 } },
-      { "id": "cache", "label": "Redis Cache", "description": "Session and query cache", "category": "data", "position": { "row": 1, "col": 1 } },
-      { "id": "web", "label": "React SPA", "description": "Main web application", "category": "ui", "position": { "row": 0, "col": 2 } },
-      { "id": "worker", "label": "Background Jobs", "description": "Task scheduling and notifications", "category": "infra", "position": { "row": 1, "col": 2 } }
+      { "id": "auth", "label": "Auth Service", "description": "JWT authentication and RBAC", "category": "core" },
+      { "id": "api", "label": "REST API", "description": "Express.js API gateway", "category": "api" },
+      { "id": "db", "label": "PostgreSQL", "description": "Primary data store", "category": "data" },
+      { "id": "cache", "label": "Redis Cache", "description": "Session and query cache", "category": "data" },
+      { "id": "web", "label": "React SPA", "description": "Main web application", "category": "ui" },
+      { "id": "worker", "label": "Background Jobs", "description": "Task scheduling and notifications", "category": "infra" }
     ],
     "connections": [
       { "from": "web", "to": "api", "label": "HTTP" },

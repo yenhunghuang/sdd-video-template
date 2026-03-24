@@ -119,7 +119,6 @@ function extractArchitecture(content: string): {
     label: string;
     description?: string;
     category: "core" | "api" | "data" | "ui" | "infra" | "external";
-    position: { row: number; col: number };
   }>;
   connections: Array<{ from: string; to: string; label?: string }>;
 } {
@@ -132,7 +131,6 @@ function extractArchitecture(content: string): {
     label: string;
     description?: string;
     category: "core" | "api" | "data" | "ui" | "infra" | "external";
-    position: { row: number; col: number };
   }> = [];
 
   // Look for project structure to infer modules
@@ -162,7 +160,6 @@ function extractArchitecture(content: string): {
         id: dirName,
         label: dirName.charAt(0).toUpperCase() + dirName.slice(1),
         category,
-        position: { row: Math.floor(idx / 3), col: idx % 3 },
       });
       idx++;
     }
@@ -174,7 +171,6 @@ function extractArchitecture(content: string): {
       id: "core",
       label: "Core",
       category: "core",
-      position: { row: 0, col: 1 },
     });
   }
 

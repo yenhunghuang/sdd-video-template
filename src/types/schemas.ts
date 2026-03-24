@@ -16,10 +16,6 @@ export const ModuleDefinitionSchema = z.object({
   label: z.string(),
   description: z.string().optional(),
   category: ModuleCategorySchema,
-  position: z.object({
-    row: z.number(),
-    col: z.number(),
-  }),
 });
 
 export const ArchitectureDefinitionSchema = z.object({

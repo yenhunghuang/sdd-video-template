@@ -3,6 +3,7 @@ import {
   useCurrentFrame,
   useVideoConfig,
   spring,
+  interpolate,
   interpolateColors,
   AbsoluteFill,
 } from "remotion";
@@ -35,6 +36,7 @@ const LAYER_PAD_Y = 44; // top (room for label)
 const LAYER_PAD_BOTTOM = 16;
 const PADDING = 80;
 const TITLE_HEIGHT = 56;
+const STAGGER_FRAMES = 5;
 
 // --- Category display names ---
 const CATEGORY_CN: Record<string, string> = {
@@ -102,6 +104,40 @@ const getModuleColors = (
   };
 };
 
+// --- Edge point calculation (T-006) ---
+type Point = { x: number; y: number };
+type Rect = { x: number; y: number; w: number; h: number };
+
+const getEdgePoint = (
+  fromCenter: Point,
+  toCenter: Point,
+  rect: Rect,
+): Point => {
+  const dx = toCenter.x - fromCenter.x;
+  const dy = toCenter.y - fromCenter.y;
+  const absDx = Math.abs(dx);
+  const absDy = Math.abs(dy);
+
+  if (absDx / rect.w > absDy / rect.h) {
+    // Horizontal dominant → exit from left or right edge
+    const edgeX = dx > 0 ? rect.x + rect.w : rect.x;
+    return { x: edgeX, y: fromCenter.y };
+  } else {
+    // Vertical dominant → exit from top or bottom edge
+    const edgeY = dy > 0 ? rect.y + rect.h : rect.y;
+    return { x: fromCenter.x, y: edgeY };
+  }
+};
+
+// --- Text width estimation (T-007) ---
+const estimateTextWidth = (text: string, fontSize: number): number => {
+  let w = 0;
+  for (const ch of text) {
+    w += ch.charCodeAt(0) > 0x7f ? fontSize * 1.2 : fontSize * 0.65;
+  }
+  return w;
+};
+
 export const ArchitectureDiagram: React.FC<ArchitectureDiagramProps> = ({
   architecture,
   coloredModules,
@@ -135,13 +171,10 @@ export const ArchitectureDiagram: React.FC<ArchitectureDiagramProps> = ({
   }
 
   // --- Compute grid layout per category row ---
-  // Each category becomes a horizontal "layer row"
-  // Modules within a category are arranged in a single row
-
-  // Compute layer dimensions
   type LayerInfo = {
     category: ModuleCategory;
     modules: ModuleDefinition[];
+    layerIndex: number;
     x: number;
     y: number;
     w: number;
@@ -149,22 +182,34 @@ export const ArchitectureDiagram: React.FC<ArchitectureDiagramProps> = ({
     modulePositions: Array<{ mod: ModuleDefinition; x: number; y: number }>;
   };
 
-  const layers: LayerInfo[] = [];
-  let currentY = TITLE_HEIGHT + PADDING;
-
+  // First pass: compute natural widths
+  const layerNaturalWidths: number[] = [];
   for (const cat of categoryOrder) {
     const mods = categoryModules.get(cat) ?? [];
     const cols = mods.length;
-
-    // Module area width (modules + gaps between them)
     const moduleAreaW = cols * MODULE_W + (cols - 1) * GAP_X;
-    const layerW = Math.max(moduleAreaW + 2 * LAYER_PAD_X, 300);
+    layerNaturalWidths.push(Math.max(moduleAreaW + 2 * LAYER_PAD_X, 300));
+  }
+
+  // T-003: Unify all layers to max width
+  const maxLayerW = Math.max(...layerNaturalWidths);
+
+  const layers: LayerInfo[] = [];
+  let currentY = TITLE_HEIGHT + PADDING;
+
+  for (let li = 0; li < categoryOrder.length; li++) {
+    const cat = categoryOrder[li];
+    const mods = categoryModules.get(cat) ?? [];
+    const cols = mods.length;
+
+    const moduleAreaW = cols * MODULE_W + (cols - 1) * GAP_X;
+    const layerW = maxLayerW;
 
     // Center the layer horizontally
     const layerX = (width - layerW) / 2;
     const layerH = LAYER_PAD_Y + MODULE_H + LAYER_PAD_BOTTOM;
 
-    // Position modules within the layer
+    // Position modules within the layer (centered in unified width)
     const moduleStartX = layerX + (layerW - moduleAreaW) / 2;
     const moduleY = currentY + LAYER_PAD_Y;
     const modulePositions = mods.map((mod, i) => ({
@@ -176,6 +221,7 @@ export const ArchitectureDiagram: React.FC<ArchitectureDiagramProps> = ({
     layers.push({
       category: cat,
       modules: mods,
+      layerIndex: li,
       x: layerX,
       y: currentY,
       w: layerW,
@@ -191,16 +237,30 @@ export const ArchitectureDiagram: React.FC<ArchitectureDiagramProps> = ({
   const scale = totalContentH > height ? height / totalContentH : 1;
   const translateY = scale < 1 ? 0 : (height - totalContentH) / 2;
 
-  // Build module center lookup (for connections)
-  const moduleCenters = new Map<string, { cx: number; cy: number }>();
+  // T-006: Build module rect lookup (for edge connections)
+  const moduleRects = new Map<string, Rect>();
+  const moduleCenters = new Map<string, Point>();
+  const moduleLayerIndex = new Map<string, number>();
   for (const layer of layers) {
     for (const mp of layer.modulePositions) {
+      moduleRects.set(mp.mod.id, { x: mp.x, y: mp.y, w: MODULE_W, h: MODULE_H });
       moduleCenters.set(mp.mod.id, {
-        cx: mp.x + MODULE_W / 2,
-        cy: mp.y + MODULE_H / 2,
+        x: mp.x + MODULE_W / 2,
+        y: mp.y + MODULE_H / 2,
       });
+      moduleLayerIndex.set(mp.mod.id, layer.layerIndex);
     }
   }
+
+  // T-005: Layer entrance animation progress
+  const getLayerProgress = (layerIdx: number): number => {
+    return spring({
+      frame: Math.max(0, frame - animationStartFrame - layerIdx * STAGGER_FRAMES),
+      fps,
+      durationInFrames: animationDuration,
+      config: { damping: 200 },
+    });
+  };
 
   const isModuleActive = (id: string) =>
     coloredModules.includes(id) ||
@@ -225,6 +285,14 @@ export const ArchitectureDiagram: React.FC<ArchitectureDiagramProps> = ({
             <filter id="card-shadow" x="-4%" y="-4%" width="108%" height="116%">
               <feDropShadow dx="0" dy="2" stdDeviation="4" floodColor="#000000" floodOpacity="0.3" />
             </filter>
+            {/* T-004: ClipPaths for accent bar clipping */}
+            {layers.map((layer) =>
+              layer.modulePositions.map(({ mod, x, y }) => (
+                <clipPath key={`clip-${mod.id}`} id={`clip-${mod.id}`}>
+                  <rect x={x} y={y} width={MODULE_W} height={MODULE_H} rx={10} />
+                </clipPath>
+              )),
+            )}
           </defs>
 
           {/* Title */}
@@ -240,77 +308,99 @@ export const ArchitectureDiagram: React.FC<ArchitectureDiagramProps> = ({
             {architecture.title}
           </text>
 
-          {/* Layer containers */}
-          {layers.map((layer) => (
-            <g key={`layer-${layer.category}`}>
-              {/* Layer background */}
-              <rect
-                x={layer.x}
-                y={layer.y}
-                width={layer.w}
-                height={layer.h}
-                rx={12}
-                fill={layerBg(layer.category)}
-                stroke={layerBorder(layer.category)}
-                strokeWidth={1.5}
-                strokeDasharray="6 3"
-              />
-              {/* Layer label — Chinese */}
-              <text
-                x={layer.x + 16}
-                y={layer.y + 20}
-                fill={MODULE_COLORS[layer.category].light}
-                fontSize={15}
-                fontFamily="Inter, system-ui, sans-serif"
-                fontWeight={700}
-              >
-                {CATEGORY_CN[layer.category] ?? layer.category}
-              </text>
-              {/* Layer label — English */}
-              <text
-                x={layer.x + 16}
-                y={layer.y + 36}
-                fill={THEME.muted}
-                fontSize={11}
-                fontFamily="Inter, system-ui, sans-serif"
-                fontWeight={400}
-              >
-                {CATEGORY_EN[layer.category] ?? layer.category}
-              </text>
-            </g>
-          ))}
+          {/* Pass 1: Layer backgrounds + labels */}
+          {layers.map((layer) => {
+            const lp = getLayerProgress(layer.layerIndex);
+            const layerOpacity = interpolate(lp, [0, 1], [0, 1]);
+            const layerTranslateY = interpolate(lp, [0, 1], [20, 0]);
 
-          {/* Connection lines (below modules) */}
+            return (
+              <g
+                key={`layer-bg-${layer.category}`}
+                opacity={layerOpacity}
+                transform={`translate(0, ${layerTranslateY})`}
+              >
+                <rect
+                  x={layer.x}
+                  y={layer.y}
+                  width={layer.w}
+                  height={layer.h}
+                  rx={12}
+                  fill={layerBg(layer.category)}
+                  stroke={layerBorder(layer.category)}
+                  strokeWidth={1.5}
+                  strokeDasharray="6 3"
+                />
+                <text
+                  x={layer.x + 16}
+                  y={layer.y + 20}
+                  fill={MODULE_COLORS[layer.category].light}
+                  fontSize={15}
+                  fontFamily="Inter, system-ui, sans-serif"
+                  fontWeight={700}
+                >
+                  {CATEGORY_CN[layer.category] ?? layer.category}
+                </text>
+                <text
+                  x={layer.x + 16}
+                  y={layer.y + 36}
+                  fill={THEME.muted}
+                  fontSize={11}
+                  fontFamily="Inter, system-ui, sans-serif"
+                  fontWeight={400}
+                >
+                  {CATEGORY_EN[layer.category] ?? layer.category}
+                </text>
+              </g>
+            );
+          })}
+
+          {/* Pass 2: Connection lines (between layer backgrounds and module cards) */}
           {architecture.connections.map((conn) => {
-            const source = moduleCenters.get(conn.from);
-            const target = moduleCenters.get(conn.to);
-            if (!source || !target) return null;
+            const sourceCenter = moduleCenters.get(conn.from);
+            const targetCenter = moduleCenters.get(conn.to);
+            const sourceRect = moduleRects.get(conn.from);
+            const targetRect = moduleRects.get(conn.to);
+            if (!sourceCenter || !targetCenter || !sourceRect || !targetRect) return null;
+
+            // T-005: Connection appears only after both endpoint layers are visible
+            const srcLayerIdx = moduleLayerIndex.get(conn.from) ?? 0;
+            const tgtLayerIdx = moduleLayerIndex.get(conn.to) ?? 0;
+            const srcLayerProgress = getLayerProgress(srcLayerIdx);
+            const tgtLayerProgress = getLayerProgress(tgtLayerIdx);
+            const connProgress = Math.min(srcLayerProgress, tgtLayerProgress);
+
+            if (connProgress < 0.01) return null;
+
+            // T-006: Edge points instead of centers
+            const sourceEdge = getEdgePoint(sourceCenter, targetCenter, sourceRect);
+            const targetEdge = getEdgePoint(targetCenter, sourceCenter, targetRect);
 
             const bothActive = isModuleActive(conn.from) && isModuleActive(conn.to);
             const lineColor = bothActive ? THEME.accent : THEME.muted;
             const markerId = bothActive ? "url(#arrow-active)" : "url(#arrow)";
-            const lineOpacity = bothActive ? 0.8 : 0.4;
+            const lineOpacity = (bothActive ? 0.8 : 0.4) * connProgress;
 
-            // Connection path: use slight curve for all
-            const dx = target.cx - source.cx;
-            const dy = target.cy - source.cy;
-            const midX = (source.cx + target.cx) / 2;
-            const midY = (source.cy + target.cy) / 2;
+            // Curve calculation
+            const dx = targetEdge.x - sourceEdge.x;
+            const dy = targetEdge.y - sourceEdge.y;
+            const midX = (sourceEdge.x + targetEdge.x) / 2;
+            const midY = (sourceEdge.y + targetEdge.y) / 2;
 
-            // Offset control point perpendicular to line
             const len = Math.sqrt(dx * dx + dy * dy);
+            if (len < 1) return null;
             const curvature = len > 400 ? 0.15 : 0.08;
             const cpx = midX + (-dy / len) * len * curvature;
             const cpy = midY + (dx / len) * len * curvature;
 
             // Label position
-            const labelX = 0.25 * source.cx + 0.5 * cpx + 0.25 * target.cx;
-            const labelY = 0.25 * source.cy + 0.5 * cpy + 0.25 * target.cy;
+            const labelX = 0.25 * sourceEdge.x + 0.5 * cpx + 0.25 * targetEdge.x;
+            const labelY = 0.25 * sourceEdge.y + 0.5 * cpy + 0.25 * targetEdge.y;
 
             return (
               <g key={`${conn.from}-${conn.to}`}>
                 <path
-                  d={`M ${source.cx} ${source.cy} Q ${cpx} ${cpy} ${target.cx} ${target.cy}`}
+                  d={`M ${sourceEdge.x} ${sourceEdge.y} Q ${cpx} ${cpy} ${targetEdge.x} ${targetEdge.y}`}
                   stroke={lineColor}
                   strokeWidth={2}
                   fill="none"
@@ -320,13 +410,13 @@ export const ArchitectureDiagram: React.FC<ArchitectureDiagramProps> = ({
                 {conn.label && (
                   <>
                     <rect
-                      x={labelX - conn.label.length * 4 - 6}
+                      x={labelX - estimateTextWidth(conn.label, 11) / 2 - 8}
                       y={labelY - 10}
-                      width={conn.label.length * 8 + 12}
+                      width={estimateTextWidth(conn.label, 11) + 16}
                       height={20}
                       fill={THEME.bg}
                       rx={4}
-                      opacity={0.9}
+                      opacity={0.9 * connProgress}
                     />
                     <text
                       x={labelX}
@@ -336,7 +426,7 @@ export const ArchitectureDiagram: React.FC<ArchitectureDiagramProps> = ({
                       fontSize={11}
                       fontFamily="Inter, system-ui, sans-serif"
                       fontWeight={600}
-                      opacity={0.9}
+                      opacity={0.9 * connProgress}
                     >
                       {conn.label}
                     </text>
@@ -346,83 +436,95 @@ export const ArchitectureDiagram: React.FC<ArchitectureDiagramProps> = ({
             );
           })}
 
-          {/* Module cards */}
-          {layers.map((layer) =>
-            layer.modulePositions.map(({ mod, x, y }) => {
-              const colors = getModuleColors(mod, coloredModules, highlightModules, progress);
+          {/* Pass 3: Module cards (on top of connections) */}
+          {layers.map((layer) => {
+            const lp = getLayerProgress(layer.layerIndex);
+            const layerOpacity = interpolate(lp, [0, 1], [0, 1]);
+            const layerTranslateY = interpolate(lp, [0, 1], [20, 0]);
 
-              // Category accent bar color
-              const accentColor = coloredModules.includes(mod.id) || highlightModules.includes(mod.id)
-                ? interpolateColors(progress, [0, 1], [THEME.muted, MODULE_COLORS[mod.category].base])
-                : THEME.muted;
+            return (
+              <g
+                key={`layer-cards-${layer.category}`}
+                opacity={layerOpacity}
+                transform={`translate(0, ${layerTranslateY})`}
+              >
+                {layer.modulePositions.map(({ mod, x, y }) => {
+                  const colors = getModuleColors(mod, coloredModules, highlightModules, progress);
 
-              return (
-                <g key={mod.id} filter="url(#card-shadow)">
-                  {/* Card background */}
-                  <rect
-                    x={x}
-                    y={y}
-                    width={MODULE_W}
-                    height={MODULE_H}
-                    rx={10}
-                    fill={colors.fill}
-                    stroke={colors.stroke}
-                    strokeWidth={1.5}
-                  />
-                  {/* Left accent bar */}
-                  <rect
-                    x={x}
-                    y={y}
-                    width={4}
-                    height={MODULE_H}
-                    rx={2}
-                    fill={accentColor}
-                  />
-                  {/* Module label */}
-                  <text
-                    x={x + 18}
-                    y={y + (mod.description || showDescriptions ? 28 : MODULE_H / 2 + 6)}
-                    fill={colors.labelColor}
-                    fontSize={15}
-                    fontFamily="Inter, system-ui, sans-serif"
-                    fontWeight={700}
-                  >
-                    {mod.label}
-                  </text>
-                  {/* Module description */}
-                  {(showDescriptions || mod.description) && mod.description && (
-                    <text
-                      x={x + 18}
-                      y={y + 48}
-                      fill={colors.text}
-                      fontSize={11}
-                      fontFamily="Inter, system-ui, sans-serif"
-                      fontWeight={400}
-                      opacity={0.7}
-                    >
-                      {mod.description.length > 28
-                        ? mod.description.slice(0, 26) + "…"
-                        : mod.description}
-                    </text>
-                  )}
-                  {/* Business annotation */}
-                  {moduleAnnotations?.[mod.id] && (
-                    <text
-                      x={x + MODULE_W / 2}
-                      y={y + MODULE_H + 16}
-                      textAnchor="middle"
-                      fill={THEME.accent}
-                      fontSize={11}
-                      fontFamily="Inter, system-ui, sans-serif"
-                      fontWeight={600}
-                    >
-                      {moduleAnnotations[mod.id]}
-                    </text>
-                  )}
-                </g>
-              );
-            }),
-          )}
+                  const accentColor = coloredModules.includes(mod.id) || highlightModules.includes(mod.id)
+                    ? interpolateColors(progress, [0, 1], [THEME.muted, MODULE_COLORS[mod.category].base])
+                    : THEME.muted;
+
+                  return (
+                    <g key={mod.id} filter="url(#card-shadow)">
+                      {/* Card background */}
+                      <rect
+                        x={x}
+                        y={y}
+                        width={MODULE_W}
+                        height={MODULE_H}
+                        rx={10}
+                        fill={colors.fill}
+                        stroke={colors.stroke}
+                        strokeWidth={1.5}
+                      />
+                      {/* Left accent bar (clipped to card shape) */}
+                      <g clipPath={`url(#clip-${mod.id})`}>
+                        <rect
+                          x={x}
+                          y={y}
+                          width={4}
+                          height={MODULE_H}
+                          fill={accentColor}
+                        />
+                      </g>
+                      {/* Module label */}
+                      <text
+                        x={x + 18}
+                        y={y + (mod.description || showDescriptions ? 28 : MODULE_H / 2 + 6)}
+                        fill={colors.labelColor}
+                        fontSize={15}
+                        fontFamily="Inter, system-ui, sans-serif"
+                        fontWeight={700}
+                      >
+                        {mod.label}
+                      </text>
+                      {/* Module description */}
+                      {(showDescriptions || mod.description) && mod.description && (
+                        <text
+                          x={x + 18}
+                          y={y + 48}
+                          fill={colors.text}
+                          fontSize={11}
+                          fontFamily="Inter, system-ui, sans-serif"
+                          fontWeight={400}
+                          opacity={0.7}
+                        >
+                          {mod.description.length > 28
+                            ? mod.description.slice(0, 26) + "…"
+                            : mod.description}
+                        </text>
+                      )}
+                      {/* Business annotation */}
+                      {moduleAnnotations?.[mod.id] && (
+                        <text
+                          x={x + MODULE_W / 2}
+                          y={y + MODULE_H + 16}
+                          textAnchor="middle"
+                          fill={THEME.accent}
+                          fontSize={11}
+                          fontFamily="Inter, system-ui, sans-serif"
+                          fontWeight={600}
+                        >
+                          {moduleAnnotations[mod.id]}
+                        </text>
+                      )}
+                    </g>
+                  );
+                })}
+              </g>
+            );
+          })}
         </g>
       </svg>
     </AbsoluteFill>
