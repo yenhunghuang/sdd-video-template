@@ -17,9 +17,11 @@ import { SpecDiff } from "../components/SpecDiff";
 import { TaskChecklist } from "../components/TaskChecklist";
 import { ArchitectureDiagram } from "../components/ArchitectureDiagram";
 import { CounterAnimation } from "../components/CounterAnimation";
+import { BusinessSummaryScene } from "../components/BusinessSummaryScene";
 import { THEME } from "../styles/theme";
 
 const TRANSITION_FRAMES = 15;
+const BUSINESS_SUMMARY_FRAMES = 90;
 // Genesis section
 const TITLE_FRAMES = 180;
 const PRINCIPLE_STAGGER = 120;
@@ -185,9 +187,25 @@ const TaskSummaryScene: React.FC<{
 
 export const FullStoryVideo: React.FC<FullStoryData> = (props) => {
   const principlesDuration = props.principles.length * PRINCIPLE_STAGGER + 60;
+  const audience = props.audience ?? "technical";
 
   const iterationElements = props.iterations.flatMap((iteration, i) => {
-    const tasksDuration = iteration.tasks.length * TASK_STAGGER + TASK_BASE;
+    const specDiff = audience === "business" && iteration.businessSpecDiff
+      ? iteration.businessSpecDiff
+      : iteration.specDiff;
+    const tasks = audience === "business" && iteration.businessTasks
+      ? iteration.businessTasks
+      : iteration.tasks;
+    const tasksDuration = tasks.length * TASK_STAGGER + TASK_BASE;
+
+    const moduleAnnotations = audience === "business" && iteration.businessTasks
+      ? Object.fromEntries(
+          iteration.highlightModules
+            .map((modId, idx) => [modId, iteration.businessTasks?.[idx]?.title ?? ""])
+            .filter(([, v]) => v)
+        )
+      : undefined;
+
     return [
       <TransitionSeries.Transition
         key={`trans-sep-${i}`}
@@ -208,6 +226,12 @@ export const FullStoryVideo: React.FC<FullStoryData> = (props) => {
           subtitle={iteration.summary}
         />
       </TransitionSeries.Sequence>,
+      ...(audience === "business" && iteration.businessImpact ? [
+        <TransitionSeries.Transition key={`trans-biz-${i}`} presentation={fade()} timing={linearTiming({ durationInFrames: TRANSITION_FRAMES })} />,
+        <TransitionSeries.Sequence key={`biz-${i}`} durationInFrames={BUSINESS_SUMMARY_FRAMES}>
+          <BusinessSummaryScene impact={iteration.businessImpact} />
+        </TransitionSeries.Sequence>,
+      ] : []),
       <TransitionSeries.Transition
         key={`trans-diff-${i}`}
         presentation={fade()}
@@ -222,8 +246,8 @@ export const FullStoryVideo: React.FC<FullStoryData> = (props) => {
           }}
         >
           <SpecDiff
-            before={iteration.specDiff.before}
-            after={iteration.specDiff.after}
+            before={specDiff.before}
+            after={specDiff.after}
             transitionFrame={Math.floor(SPEC_DIFF_FRAMES / 2)}
             style={{ maxWidth: 1200 }}
           />
@@ -255,7 +279,7 @@ export const FullStoryVideo: React.FC<FullStoryData> = (props) => {
           >
             Completed Tasks
           </div>
-          <TaskChecklist tasks={iteration.tasks} staggerDelay={TASK_STAGGER} />
+          <TaskChecklist tasks={tasks} staggerDelay={TASK_STAGGER} />
         </AbsoluteFill>
       </TransitionSeries.Sequence>,
       <TransitionSeries.Transition
@@ -269,6 +293,7 @@ export const FullStoryVideo: React.FC<FullStoryData> = (props) => {
           coloredModules={iteration.coloredModules}
           highlightModules={iteration.highlightModules}
           animationStartFrame={15}
+          moduleAnnotations={moduleAnnotations}
         />
       </TransitionSeries.Sequence>,
     ];
@@ -346,17 +371,25 @@ export const calculateFullStoryMetadata: CalculateMetadataFunction<
     TITLE_FRAMES + principlesDuration + ARCH_FRAMES + TASK_FRAMES;
   const genesisTransitions = 3 * TRANSITION_FRAMES;
 
-  // Each iteration: separator + title + specDiff + tasks + arch
+  const audience = props.audience ?? "technical";
+
+  // Each iteration: separator + title + [bizSummary] + specDiff + tasks + arch
   let iterationTotal = 0;
   for (const it of props.iterations) {
-    const tasksDuration = it.tasks.length * TASK_STAGGER + TASK_BASE;
+    const tasks = audience === "business" && it.businessTasks
+      ? it.businessTasks
+      : it.tasks;
+    const tasksDuration = tasks.length * TASK_STAGGER + TASK_BASE;
+    const hasBizSummary = audience === "business" && it.businessImpact;
+    const bizFrames = hasBizSummary ? BUSINESS_SUMMARY_FRAMES : 0;
     const iterScenes =
       SEPARATOR_FRAMES +
       ITER_TITLE_FRAMES +
+      bizFrames +
       SPEC_DIFF_FRAMES +
       tasksDuration +
       ITER_ARCH_FRAMES;
-    const iterTransitions = 4 * TRANSITION_FRAMES;
+    const iterTransitions = (hasBizSummary ? 5 : 4) * TRANSITION_FRAMES;
     iterationTotal += iterScenes - iterTransitions;
   }
 

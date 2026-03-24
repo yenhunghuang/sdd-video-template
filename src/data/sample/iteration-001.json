@@ -35,5 +35,17 @@
     ]
   },
   "coloredModules": ["auth", "api"],
-  "highlightModules": ["api"]
+  "highlightModules": ["api"],
+  "businessImpact": "使用者現在可以安全登入，不同角色看到不同功能",
+  "businessSpecDiff": {
+    "before": "任何人都可以看到所有資料",
+    "after": "每個人只看到自己有權限的內容"
+  },
+  "businessTasks": [
+    { "id": "T-009", "title": "完成：安全的身份驗證機制", "status": "completed" },
+    { "id": "T-010", "title": "完成：新使用者註冊流程", "status": "completed" },
+    { "id": "T-011", "title": "完成：登入與登出功能", "status": "completed" },
+    { "id": "T-012", "title": "完成：不同角色看到不同功能", "status": "completed" },
+    { "id": "T-013", "title": "社群帳號登入（暫緩）", "status": "skipped" }
+  ]
 }

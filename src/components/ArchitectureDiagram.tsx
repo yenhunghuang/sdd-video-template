@@ -19,6 +19,7 @@ type ArchitectureDiagramProps = {
   animationStartFrame: number;
   animationDuration?: number;
   showDescriptions?: boolean;
+  moduleAnnotations?: Record<string, string>;
   width?: number;
   height?: number;
 };
@@ -87,6 +88,7 @@ export const ArchitectureDiagram: React.FC<ArchitectureDiagramProps> = ({
   animationStartFrame,
   animationDuration = 20,
   showDescriptions = false,
+  moduleAnnotations,
   width = 1920,
   height = 1080,
 }) => {
@@ -379,6 +381,20 @@ export const ArchitectureDiagram: React.FC<ArchitectureDiagramProps> = ({
                   opacity={0.8}
                 >
                   {mod.description}
+                </text>
+              )}
+              {moduleAnnotations?.[mod.id] && (
+                <text
+                  x={pos.x + moduleWidth / 2}
+                  y={pos.y + moduleHeight + 16}
+                  textAnchor="middle"
+                  fill={THEME.text}
+                  fontSize={11}
+                  fontFamily="Inter, system-ui, sans-serif"
+                  fontWeight={400}
+                  opacity={0.8}
+                >
+                  {moduleAnnotations[mod.id]}
                 </text>
               )}
             </g>

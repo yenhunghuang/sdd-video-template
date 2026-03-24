@@ -14,10 +14,11 @@ speckit-to-genesis.ts ── converts SpecKit format to OpenSpec archived format
 parse-archive.ts ─────── extracts structured data, validates with Zod
     |
     v
-JSON (GenesisData / IterationData)
+JSON (GenesisData / IterationData / FullStoryData)
     |
     v
 Remotion Component ────── React scenes with spring/interpolate animations
+                          supports audience mode (technical / business)
     |
     v
 MP4 (1920x1080 30fps)
@@ -42,6 +43,7 @@ bun dev
 # 4. Render video
 bun run render -- GenesisVideo     # Genesis video
 bun run render -- IterationVideo   # Iteration video
+bun run render -- FullStoryVideo   # Full story (genesis + all iterations)
 ```
 
 ### From Your SDD Files
@@ -78,6 +80,7 @@ bun run render -- IterationVideo
 | `bun run init` | Initialize template for your project |
 | `bun run speckit-to-genesis` | Convert SpecKit → OpenSpec archived |
 | `bun run parse-archive` | Parse archived markdown → JSON |
+| `bun run parse-archive -- --audience business` | Parse with business audience mode |
 
 ## Project Structure
 
@@ -87,6 +90,7 @@ src/
   templates/
     GenesisVideo.tsx        # 45-60s "genesis" video (project birth)
     IterationVideo.tsx      # 15-20s iteration change video
+    FullStoryVideo.tsx      # Genesis + all iterations in one video
     EvolutionTimeline.tsx   # (P2) full project timeline
     SprintReview.tsx        # (P2) sprint review summary
   components/
@@ -96,6 +100,7 @@ src/
     CounterAnimation.tsx    # Animated number counter
     SceneTitle.tsx          # Scene title card with fade-in + scale
     ArchitectureDiagram.tsx # SVG architecture diagram with progressive coloring
+    BusinessSummaryScene.tsx # Business impact summary (audience: business)
   styles/theme.ts           # Color palette (THEME, MODULE_COLORS, GRAY)
   data/sample/              # Sample JSON data (replace with your own)
 scripts/
@@ -117,6 +122,23 @@ The "birth" of a project. Shows project name, core principles, architecture over
 A single iteration/change. Shows what changed (spec diff), completed tasks, and newly colored architecture modules.
 
 **Input**: `IterationData` — change name, summary, motivation, spec before/after, tasks, architecture with colored/highlighted modules.
+
+### FullStoryVideo (P1)
+
+Genesis + all iterations merged into one continuous evolution video. Architecture is defined once at the top level; each iteration progressively colors modules.
+
+**Input**: `FullStoryData` — genesis data + iterations array (without duplicated architecture).
+
+### Audience Mode
+
+All templates support `audience` parameter (`"technical"` | `"business"`, default: `"technical"`).
+
+| Mode | Audience | Content |
+|------|----------|---------|
+| `technical` | Engineers | Spec diff, task IDs, technical details |
+| `business` | PM / 主管 / 業務 | Business impact summary, plain-language changes |
+
+Business mode uses optional fields: `businessImpact`, `businessSpecDiff`, `businessTasks`. If absent, falls back to technical content.
 
 ### EvolutionTimeline (P2 - not yet implemented)
 
@@ -185,7 +207,16 @@ The JSON files in `src/data/sample/` drive everything. Edit them directly or gen
   ],
   "architecture": { /* same as genesis */ },
   "coloredModules": ["auth", "api"],      // already implemented (colored from start)
-  "highlightModules": ["api"]             // newly added (animate gray → color)
+  "highlightModules": ["api"],            // newly added (animate gray → color)
+  // Optional: business audience fields (fallback to technical if absent)
+  "businessImpact": "使用者現在可以安全登入，不同角色看到不同功能",
+  "businessSpecDiff": {
+    "before": "任何人都可以看到所有資料",
+    "after": "每個人只看到自己有權限的內容"
+  },
+  "businessTasks": [
+    { "id": "T-001", "title": "完成：安全的身份驗證機制", "status": "completed" }
+  ]
 }
 ```
 

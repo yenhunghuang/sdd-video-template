@@ -79,6 +79,23 @@ export const IterationDataSchema = z.object({
   architecture: ArchitectureDefinitionSchema,
   coloredModules: z.array(z.string()),
   highlightModules: z.array(z.string()),
+  audience: z.enum(["technical", "business"]).default("technical").optional(),
+  businessImpact: z.string().optional(),
+  businessSpecDiff: z
+    .object({
+      before: z.string(),
+      after: z.string(),
+    })
+    .optional(),
+  businessTasks: z
+    .array(
+      z.object({
+        id: z.string(),
+        title: z.string(),
+        status: z.enum(["completed", "skipped"]),
+      }),
+    )
+    .optional(),
 });
 
 export const EvolutionDataSchema = z.object({
@@ -141,6 +158,22 @@ export const FullStoryIterationSchema = z.object({
   ),
   coloredModules: z.array(z.string()),
   highlightModules: z.array(z.string()),
+  businessImpact: z.string().optional(),
+  businessSpecDiff: z
+    .object({
+      before: z.string(),
+      after: z.string(),
+    })
+    .optional(),
+  businessTasks: z
+    .array(
+      z.object({
+        id: z.string(),
+        title: z.string(),
+        status: z.enum(["completed", "skipped"]),
+      }),
+    )
+    .optional(),
 });
 
 export const FullStoryDataSchema = z.object({
@@ -165,6 +198,7 @@ export const FullStoryDataSchema = z.object({
   }),
   targetUsers: z.array(z.string()),
   iterations: z.array(FullStoryIterationSchema),
+  audience: z.enum(["technical", "business"]).default("technical").optional(),
 });
 
 // --- Inferred types ---

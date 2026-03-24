@@ -13,6 +13,7 @@ const { values } = parseArgs({
   options: {
     input: { type: "string" },
     output: { type: "string" },
+    audience: { type: "string" },
   },
 });
 
@@ -301,6 +302,29 @@ function extractSpecDiff(content: string): { before: string; after: string } {
   };
 }
 
+/** 從 motivation 提取業務影響（取第一句） */
+function extractBusinessImpact(motivation: string): string {
+  const firstSentence = motivation.split(/[。.！!？?]/)[0];
+  return firstSentence?.trim() || motivation;
+}
+
+/** 從 specDiff 產出業務版（初版直接複製） */
+function extractBusinessSpecDiff(specDiff: { before: string; after: string }): { before: string; after: string } {
+  return { ...specDiff };
+}
+
+/** 從 tasks 產出業務版（移除技術前綴） */
+function extractBusinessTasks(
+  tasks: Array<{ id: string; title: string; status: "completed" | "skipped" }>
+): Array<{ id: string; title: string; status: "completed" | "skipped" }> {
+  return tasks.map((t) => ({
+    ...t,
+    title: t.title
+      .replace(/^(?:Setup|Implement|Add|Configure|Create|Install|Initialize|Refactor|Update|Fix)\s+/i, "完成：")
+      .trim(),
+  }));
+}
+
 // --- Build data based on type ---
 
 function outputJson(data: unknown, output: string | undefined): void {
@@ -400,6 +424,10 @@ async function parseSingleDir(
     const iterationNumber = overrideIterationNumber
       ?? (specKit ? nnn![1] : "001");
 
+    const businessImpact = (proposal.data.businessImpact as string) ?? extractBusinessImpact(motivation);
+    const businessSpecDiff = (proposal.data.businessSpecDiff as { before: string; after: string }) ?? extractBusinessSpecDiff(specDiff);
+    const businessTasks = extractBusinessTasks(tasks);
+
     const data = {
       type: "iteration" as const,
       iterationNumber,
@@ -411,6 +439,10 @@ async function parseSingleDir(
       architecture,
       coloredModules,
       highlightModules,
+      ...(values.audience ? { audience: values.audience } : {}),
+      businessImpact,
+      businessSpecDiff,
+      businessTasks,
     };
 
     const result = IterationDataSchema.safeParse(data);

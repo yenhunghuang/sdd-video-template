@@ -8,10 +8,12 @@ import { SceneTitle } from "../components/SceneTitle";
 import { SpecDiff } from "../components/SpecDiff";
 import { TaskChecklist } from "../components/TaskChecklist";
 import { ArchitectureDiagram } from "../components/ArchitectureDiagram";
+import { BusinessSummaryScene } from "../components/BusinessSummaryScene";
 import { THEME } from "../styles/theme";
 
 const TRANSITION_FRAMES = 15;
 const TITLE_FRAMES = 90;
+const BUSINESS_SUMMARY_FRAMES = 90;
 const SPEC_DIFF_FRAMES = 150;
 const ARCH_FRAMES = 120;
 const OUTRO_FRAMES = 75;
@@ -21,7 +23,16 @@ const TASK_BASE = 60;
 // --- Main component ---
 
 export const IterationVideo: React.FC<IterationData> = (props) => {
-  const tasksDuration = props.tasks.length * TASK_STAGGER + TASK_BASE;
+  const audience = props.audience ?? "technical";
+  const specDiff =
+    audience === "business" && props.businessSpecDiff
+      ? props.businessSpecDiff
+      : props.specDiff;
+  const tasks =
+    audience === "business" && props.businessTasks
+      ? props.businessTasks
+      : props.tasks;
+  const tasksDuration = tasks.length * TASK_STAGGER + TASK_BASE;
 
   return (
     <TransitionSeries>
@@ -37,6 +48,21 @@ export const IterationVideo: React.FC<IterationData> = (props) => {
         timing={linearTiming({ durationInFrames: TRANSITION_FRAMES })}
       />
 
+      {audience === "business" && props.businessImpact && (
+        <>
+          <TransitionSeries.Sequence
+            durationInFrames={BUSINESS_SUMMARY_FRAMES}
+          >
+            <BusinessSummaryScene impact={props.businessImpact} />
+          </TransitionSeries.Sequence>
+
+          <TransitionSeries.Transition
+            presentation={fade()}
+            timing={linearTiming({ durationInFrames: TRANSITION_FRAMES })}
+          />
+        </>
+      )}
+
       <TransitionSeries.Sequence durationInFrames={SPEC_DIFF_FRAMES}>
         <AbsoluteFill
           style={{
@@ -46,8 +72,8 @@ export const IterationVideo: React.FC<IterationData> = (props) => {
           }}
         >
           <SpecDiff
-            before={props.specDiff.before}
-            after={props.specDiff.after}
+            before={specDiff.before}
+            after={specDiff.after}
             transitionFrame={Math.floor(SPEC_DIFF_FRAMES / 2)}
             style={{ maxWidth: 1200 }}
           />
@@ -80,7 +106,7 @@ export const IterationVideo: React.FC<IterationData> = (props) => {
           >
             Completed Tasks
           </div>
-          <TaskChecklist tasks={props.tasks} staggerDelay={TASK_STAGGER} />
+          <TaskChecklist tasks={tasks} staggerDelay={TASK_STAGGER} />
         </AbsoluteFill>
       </TransitionSeries.Sequence>
 
@@ -116,9 +142,23 @@ export const IterationVideo: React.FC<IterationData> = (props) => {
 export const calculateIterationMetadata: CalculateMetadataFunction<
   IterationData
 > = async ({ props }) => {
-  const tasksDuration = props.tasks.length * TASK_STAGGER + TASK_BASE;
+  const audience = props.audience ?? "technical";
+  const tasks =
+    audience === "business" && props.businessTasks
+      ? props.businessTasks
+      : props.tasks;
+  const tasksDuration = tasks.length * TASK_STAGGER + TASK_BASE;
+  const hasBizSummary = audience === "business" && props.businessImpact;
+  const bizFrames = hasBizSummary
+    ? BUSINESS_SUMMARY_FRAMES + TRANSITION_FRAMES
+    : 0;
   const totalScenes =
-    TITLE_FRAMES + SPEC_DIFF_FRAMES + tasksDuration + ARCH_FRAMES + OUTRO_FRAMES;
+    TITLE_FRAMES +
+    SPEC_DIFF_FRAMES +
+    tasksDuration +
+    ARCH_FRAMES +
+    OUTRO_FRAMES +
+    bizFrames;
   const totalTransitions = 4 * TRANSITION_FRAMES;
 
   return {
