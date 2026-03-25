@@ -216,7 +216,7 @@ export const GenesisVideo: React.FC<GenesisData> = (props) => {
       <TransitionSeries.Sequence durationInFrames={ARCH_FRAMES}>
         <ArchitectureDiagram
           architecture={props.architecture}
-          coloredModules={[]}
+          coloredModules={props.architecture.modules.map((m) => m.id)}
           highlightModules={[]}
           animationStartFrame={0}
           showDescriptions

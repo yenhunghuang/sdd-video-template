@@ -277,7 +277,7 @@ export const ArchitectureDiagram: React.FC<ArchitectureDiagramProps> = ({
           {/* Arrowhead markers */}
           <defs>
             <marker id="arrow" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
-              <polygon points="0 0, 10 3.5, 0 7" fill={THEME.muted} />
+              <polygon points="0 0, 10 3.5, 0 7" fill="#94A3B8" />
             </marker>
             <marker id="arrow-active" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
               <polygon points="0 0, 10 3.5, 0 7" fill={THEME.accent} />
@@ -333,9 +333,9 @@ export const ArchitectureDiagram: React.FC<ArchitectureDiagramProps> = ({
                 />
                 <text
                   x={layer.x + 16}
-                  y={layer.y + 20}
+                  y={layer.y + 22}
                   fill={MODULE_COLORS[layer.category].light}
-                  fontSize={15}
+                  fontSize={20}
                   fontFamily="Inter, system-ui, sans-serif"
                   fontWeight={700}
                 >
@@ -343,9 +343,9 @@ export const ArchitectureDiagram: React.FC<ArchitectureDiagramProps> = ({
                 </text>
                 <text
                   x={layer.x + 16}
-                  y={layer.y + 36}
+                  y={layer.y + 40}
                   fill={THEME.muted}
-                  fontSize={11}
+                  fontSize={14}
                   fontFamily="Inter, system-ui, sans-serif"
                   fontWeight={400}
                 >
@@ -377,9 +377,9 @@ export const ArchitectureDiagram: React.FC<ArchitectureDiagramProps> = ({
             const targetEdge = getEdgePoint(targetCenter, sourceCenter, targetRect);
 
             const bothActive = isModuleActive(conn.from) && isModuleActive(conn.to);
-            const lineColor = bothActive ? THEME.accent : THEME.muted;
+            const lineColor = bothActive ? THEME.accent : "#94A3B8";
             const markerId = bothActive ? "url(#arrow-active)" : "url(#arrow)";
-            const lineOpacity = (bothActive ? 0.8 : 0.4) * connProgress;
+            const lineOpacity = (bothActive ? 0.9 : 0.7) * connProgress;
 
             // Curve calculation
             const dx = targetEdge.x - sourceEdge.x;
@@ -410,23 +410,23 @@ export const ArchitectureDiagram: React.FC<ArchitectureDiagramProps> = ({
                 {conn.label && (
                   <>
                     <rect
-                      x={labelX - estimateTextWidth(conn.label, 11) / 2 - 8}
-                      y={labelY - 10}
-                      width={estimateTextWidth(conn.label, 11) + 16}
-                      height={20}
-                      fill={THEME.bg}
+                      x={labelX - estimateTextWidth(conn.label, 12) / 2 - 8}
+                      y={labelY - 11}
+                      width={estimateTextWidth(conn.label, 12) + 16}
+                      height={22}
+                      fill="#1E293B"
                       rx={4}
-                      opacity={0.9 * connProgress}
+                      opacity={0.95 * connProgress}
                     />
                     <text
                       x={labelX}
                       y={labelY + 4}
                       textAnchor="middle"
                       fill={lineColor}
-                      fontSize={11}
+                      fontSize={12}
                       fontFamily="Inter, system-ui, sans-serif"
                       fontWeight={600}
-                      opacity={0.9 * connProgress}
+                      opacity={0.95 * connProgress}
                     >
                       {conn.label}
                     </text>
